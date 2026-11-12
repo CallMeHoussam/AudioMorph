@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AudioMorph Web — Next-Gen Cross-Platform Media Suite</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+
+  <div class="app-background">
+    <div class="glow-orb orb-1"></div>
+    <div class="glow-orb orb-2"></div>
+  </div>
+
+  <div class="app-container">
+
+    <!-- Header -->
+    <header class="navbar">
+      <div class="brand">
+        <div class="brand-logo">⚡</div>
+        <div class="brand-text">
+          <h1>AudioMorph <span>Web</span></h1>
+          <p>Universal Cross-Platform Media Processor</p>
+        </div>
+      </div>
+      <div class="status-badge">
+        <span class="pulse-dot"></span> Online & Cross-Platform
+      </div>
+    </header>
+
+    <!-- Navigation Tabs -->
+    <nav class="tab-nav">
+      <button class="tab-btn active" data-tab="converter">
+        <span class="tab-icon">🔄</span> Transcoder
+      </button>
+      <button class="tab-btn" data-tab="downloader">
+        <span class="tab-icon">📥</span> Downloader
+      </button>
+      <button class="tab-btn" data-tab="cutter">
+        <span class="tab-icon">✂️</span> Audio Cutter
+      </button>
+      <button class="tab-btn" data-tab="subtitles">
+        <span class="tab-icon">📝</span> Subtitles AI
+      </button>
+      <button class="tab-btn" data-tab="vocals">
+        <span class="tab-icon">🎤</span> Vocal Isolator
+      </button>
+    </nav>
+
+    <!-- Main Content Area -->
+    <main class="content-card">
+
+      <!-- 1. Transcoder Tab -->
+      <section id="tab-converter" class="tab-pane active">
+        <div class="pane-header">
+          <h2>Audio & Video Transcoder</h2>
+          <p>Convert any media file into high-quality MP3, WAV, FLAC, MP4, MKV, and more.</p>
+        </div>
+
+        <form id="form-converter" class="suite-form">
+          <div class="drop-zone" id="drop-converter">
+            <input type="file" id="file-converter" name="file" required hidden>
+            <div class="drop-icon">📁</div>
+            <p class="drop-title">Drag & drop your file here, or <span class="highlight">Browse</span></p>
+            <p class="file-name" id="name-converter">No file selected</p>
+          </div>
+
+          <div class="form-grid">
+            <div class="form-group">
+              <label for="output_format">Output Format</label>
+              <select id="output_format" name="output_format">
+                <option value="mp3">MP3 Audio</option>
+                <option value="wav">WAV Lossless</option>
+                <option value="m4a">M4A AAC</option>
+                <option value="flac">FLAC Audio</option>
+                <option value="mp4">MP4 Video</option>
+                <option value="mkv">MKV Video</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="bitrate">Bitrate</label>
+              <select id="bitrate" name="bitrate">
+                <option value="320 kbps">320 kbps (Maximum)</option>
+                <option value="192 kbps" selected>192 kbps (High)</option>
+                <option value="128 kbps">128 kbps (Standard)</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="sample_rate">Sample Rate</label>
+              <select id="sample_rate" name="sample_rate">
+                <option value="48000 Hz">48,000 Hz (Studio)</option>
+                <option value="44100 Hz" selected>44,100 Hz (CD)</option>
+              </select>
+            </div>
+          </div>
+
+          <button type="submit" class="submit-btn" id="btn-converter">
+            <span>Convert & Download</span>
+          </button>
+        </form>
+      </section>
+
+      <!-- 2. Downloader Tab -->
+      <section id="tab-downloader" class="tab-pane">
+        <div class="pane-header">
+          <h2>Universal URL Downloader</h2>
+          <p>Download video and audio streams from YouTube, Vecteezy, TikTok, Instagram, Kick, etc.</p>
+        </div>
+
+        <form id="form-downloader" class="suite-form">
+          <div class="form-group full-width">
+            <label for="dl_url">Media URL</label>
+            <input type="url" id="dl_url" name="url" placeholder="https://www.youtube.com/watch?v=... or Vecteezy link" required>
+          </div>
+
+          <div class="form-grid">
+            <div class="form-group">
+              <label for="download_format">Format</label>
+              <select id="download_format" name="download_format">
+                <option value="MP4">MP4 Video</option>
+                <option value="MP3">MP3 Audio</option>
+                <option value="WAV">WAV Audio</option>
+                <option value="JPG">JPG Thumbnail/Image</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="quality">Quality</label>
+              <select id="quality" name="quality">
+                <option value="Best Available">Best Available</option>
+                <option value="1080p">1080p Full HD</option>
+                <option value="720p">720p HD</option>
+                <option value="Audio Only">Audio Only</option>
+              </select>
+            </div>
+          </div>
+
+          <button type="submit" class="submit-btn" id="btn-downloader">
+            <span>Download Media</span>
+          </button>
+        </form>
+      </section>
+
+      <!-- 3. Cutter Tab -->
+      <section id="tab-cutter" class="tab-pane">
+        <div class="pane-header">
+          <h2>Audio & Video Cutter</h2>
+          <p>Trim media files with pinpoint accuracy by start and end timestamps.</p>
+        </div>
+
+        <form id="form-cutter" class="suite-form">
+          <div class="drop-zone" id="drop-cutter">
+            <input type="file" id="file-cutter" name="file" required hidden>
+            <div class="drop-icon">✂️</div>
+            <p class="drop-title">Drag & drop media to trim, or <span class="highlight">Browse</span></p>
+            <p class="file-name" id="name-cutter">No file selected</p>
+          </div>
+
+          <div class="form-grid">
+            <div class="form-group">
+              <label for="start_time">Start Time (HH:MM:SS)</label>
+              <input type="text" id="start_time" name="start_time" value="00:00:00" placeholder="00:00:00" required>
+            </div>
+
+            <div class="form-group">
+              <label for="end_time">End Time (HH:MM:SS)</label>
+              <input type="text" id="end_time" name="end_time" value="00:00:15" placeholder="00:00:15" required>
+            </div>
+          </div>
+
+          <button type="submit" class="submit-btn" id="btn-cutter">
+            <span>Trim & Download</span>
+          </button>
+        </form>
+      </section>
+
+      <!-- 4. Subtitles Tab -->
+      <section id="tab-subtitles" class="tab-pane">
+        <div class="pane-header">
+          <h2>AI Subtitle Generator (Whisper)</h2>
+          <p>Generate highly accurate SRT subtitles automatically with RTL Arabic and multi-language support.</p>
+        </div>
+
+        <form id="form-subtitles" class="suite-form">
+          <div class="drop-zone" id="drop-subtitles">
+            <input type="file" id="file-subtitles" name="file" required hidden>
+            <div class="drop-icon">📝</div>
+            <p class="drop-title">Select audio or video file, or <span class="highlight">Browse</span></p>
+            <p class="file-name" id="name-subtitles">No file selected</p>
+          </div>
+
+          <div class="form-grid">
+            <div class="form-group">
+              <label for="sub_model">Whisper Model</label>
+              <select id="sub_model" name="model">
+                <option value="tiny">Tiny (Fastest)</option>
+                <option value="base">Base (Balanced)</option>
+                <option value="small" selected>Small (High Accuracy)</option>
+                <option value="medium">Medium (Ultra)</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="sub_lang">Language</label>
+              <select id="sub_lang" name="language">
+                <option value="ar" selected>Arabic (العربية)</option>
+                <option value="en">English</option>
+                <option value="fr">French</option>
+                <option value="auto">Auto Detect</option>
+              </select>
+            </div>
+          </div>
+
+          <button type="submit" class="submit-btn" id="btn-subtitles">
+            <span>Generate SRT Subtitles</span>
+          </button>
+        </form>
+      </section>
+
+      <!-- 5. Vocals Tab -->
+      <section id="tab-vocals" class="tab-pane">
+        <div class="pane-header">
+          <h2>Vocal Separator & Isolator</h2>
+          <p>Separate vocal tracks from background music and instrumentals.</p>
+        </div>
+
+        <form id="form-vocals" class="suite-form">
+          <div class="drop-zone" id="drop-vocals">
+            <input type="file" id="file-vocals" name="file" required hidden>
+            <div class="drop-icon">🎤</div>
+            <p class="drop-title">Drop your audio track here, or <span class="highlight">Browse</span></p>
+            <p class="file-name" id="name-vocals">No file selected</p>
+          </div>
+
+          <div class="form-group full-width">
+            <label for="vocal_target">Extraction Goal</label>
+            <select id="vocal_target" name="target">
+              <option value="vocals">Isolate Vocals Only</option>
+              <option value="no_vocals">Remove Vocals (Instrumental Karaoke)</option>
+            </select>
+          </div>
+
+          <button type="submit" class="submit-btn" id="btn-vocals">
+            <span>Separate Audio Track</span>
+          </button>
+        </form>
+      </section>
+
+      <!-- Status & Feedback Area -->
+      <div id="status-card" class="status-card hidden">
+        <div class="status-header">
+          <div class="spinner" id="status-spinner"></div>
+          <span id="status-text">Processing your request...</span>
+        </div>
+        <div class="progress-bar-container">
+          <div id="progress-bar" class="progress-bar"></div>
+        </div>
+      </div>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <p>AudioMorph Web App — Works seamlessly on macOS, Windows, Linux, iOS & Android</p>
+    </footer>
+
+  </div>
+
+  <script src="/static/js/app.js"></script>
+</body>
+</html>

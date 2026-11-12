@@ -1,0 +1,48 @@
+{
+    "output_format": "mp3",
+    "bitrate": "192 kbps",
+    "sample_rate": "44100 Hz",
+    "channels": "Stereo",
+    "save_in_source": true,
+    "custom_output_dir": "",
+    "download_format": "MP4",
+    "download_quality": "Best Available",
+    "download_output_dir": "",
+    "noplaylist": true,
+    "watermark_active_preset": "Evoless Signature",
+    "watermark_presets": {
+        "Evoless Signature": {
+            "type": "text",
+            "text": "Your Name / Brand",
+            "font_family": "Segoe UI",
+            "font_size_pct": 2.2,
+            "font_weight": "Regular",
+            "text_color": "#FFFFFF",
+            "letter_spacing": 2.0,
+            "text_align": "Center",
+            "shadow_enabled": false,
+            "shadow_intensity": 60,
+            "shadow_offset": 4.0,
+            "outline_enabled": false,
+            "outline_width": 2.0,
+            "outline_color": "#000000",
+            "bg_enabled": false,
+            "bg_color": "#000000",
+            "bg_padding": 14.0,
+            "bg_opacity": 55,
+            "image_path": "",
+            "image_scale_pct": 18.0,
+            "opacity": 35,
+            "rotation": 0.0,
+            "anchor": "bottom_right",
+            "margin_pct": 4.0,
+            "norm_x": 0.88,
+            "norm_y": 0.92
+        }
+    },
+    "watermark_format": "Original (Same as input)",
+    "watermark_quality": "High (Visually Lossless / CRF 18)",
+    "watermark_save_in_source": true,
+    "watermark_output_dir": ""
+}
+

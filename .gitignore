@@ -1,0 +1,70 @@
+# ==============================================================================
+# AudioMorph Studio — Git Ignore Rules
+# ==============================================================================
+
+# --- Python Bytecode & Cache ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyc
+
+# --- Virtual Environments ---
+.venv/
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# --- Build & PyInstaller Artifacts ---
+build/
+dist/
+Output/
+*.spec.bak
+*.manifest
+
+# --- Windows Executables, Setups & Archive Artifacts ---
+*.exe
+*.msi
+*.zip
+*.tar
+*.gz
+*.rar
+*.7z
+
+# --- Large FFmpeg Binaries (Exclude from Git to keep repository lightweight) ---
+# Note: Full FFmpeg binaries are automatically included in the GitHub Release Setup installer.
+ffmpeg_engine/bin/
+ffmpeg_engine/lib/
+ffmpeg_engine/include/
+ffmpeg_engine/doc/
+ffmpeg/
+
+# --- Application Logs, Temp & Test Outputs ---
+*.log
+audiomorph.log*
+temp/
+tmp/
+*.tmp
+.cache/
+separated/
+download_history.json
+test_input.docx
+scratch_*.py
+
+# --- User-Specific Configuration & Sensitive Files ---
+settings.json
+cookies.txt
+*.cookies
+.env
+.env.*
+
+# --- OS & Editor Files ---
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+*.swp
+*~
+
