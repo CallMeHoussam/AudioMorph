@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/<YOUR_USERNAME>/AudioMorph/releases/latest">
+  <a href="https://github.com/CallMeHoussam/AudioMorph/releases/latest">
     <img src="https://img.shields.io/badge/Download_for_Windows-v2.1_Installer-7C3AED?style=for-the-badge&logo=windows&logoColor=white" alt="Download for Windows" />
   </a>
 </p>
@@ -28,7 +28,7 @@
 
 No Python, coding knowledge, or command-line setup is required!
 
-1. **Download:** Click the button above or visit [Releases Latest](https://github.com/<YOUR_USERNAME>/AudioMorph/releases/latest) and download **`AudioMorph_Setup_v2.1.exe`**.
+1. **Download:** Click the button above or visit [Releases Latest](https://github.com/CallMeHoussam/AudioMorph/releases/latest) and download **`AudioMorph_Setup_v2.1.exe`**.
 2. **Install:** Double-click the installer and follow the 3-click setup wizard.
 3. **Launch:** Open **AudioMorph Studio** directly from your Desktop or Start Menu. All engines, video codecs, and dependencies are 100% pre-packaged and ready out of the box!
 
@@ -104,7 +104,7 @@ If you want to contribute, modify, or run AudioMorph directly in Python:
 
 ### 2. Clone Repository
 ```bash
-git clone https://github.com/<YOUR_USERNAME>/AudioMorph.git
+git clone https://github.com/CallMeHoussam/AudioMorph.git
 cd AudioMorph
 ```
 
