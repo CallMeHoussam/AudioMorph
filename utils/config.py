@@ -11,6 +11,7 @@ import json
 import os
 import sys
 from pathlib import Path
+from typing import Optional
 
 from utils.logger import get_logger
 
@@ -72,6 +73,19 @@ DEFAULT_SETTINGS: dict = {
     "watermark_quality": "High (Visually Lossless / CRF 18)",
     "watermark_save_in_source": True,
     "watermark_output_dir": "",
+    "ai_provider": "Google Gemini API (Recommended)",
+    "ai_api_key": "",
+    "ai_model": "gemini-2.5-flash",
+    "ai_custom_endpoint": "http://localhost:11434/v1/chat/completions",
+    "viral_target_duration": "Reel/TikTok (30–60s)",
+    "viral_clip_count": 5,
+    "viral_sentence_guard": True,
+    "viral_reframe_mode": "Smart Speaker Center (9:16 Crop)",
+    "viral_burn_captions": True,
+    "viral_caption_style": "Viral Purple Highlight",
+    "viral_watermark_preset": "Evoless Signature",
+    "viral_output_dir": "",
+    "viral_save_in_source": True,
 }
 
 
@@ -148,6 +162,21 @@ def get_ffprobe_path() -> str:
         return system_ffprobe
 
     return str(bundled_path)
+
+
+def get_ffplay_path() -> Optional[str]:
+    """Return the absolute path to ffplay binary if available, else None."""
+    import shutil
+    exe_name = "ffplay.exe" if sys.platform == "win32" else "ffplay"
+    bundled_path = _PROJECT_ROOT / "ffmpeg_engine" / "bin" / exe_name
+    if bundled_path.exists():
+        return str(bundled_path)
+
+    system_ffplay = shutil.which("ffplay")
+    if system_ffplay:
+        return system_ffplay
+
+    return None
 
 
 def get_icon_path() -> str:

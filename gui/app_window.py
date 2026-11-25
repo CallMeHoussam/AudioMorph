@@ -19,6 +19,7 @@ from typing import Callable, Optional
 import customtkinter as ctk
 
 from core.ai_worker import AIWorker
+from core.online_trimmer import StreamMetadata, download_trimmed_segment, format_seconds
 from gui.icons import get_icon
 from gui.queue_cards import EmptyDropzoneHero, ModernQueueList
 from gui.theme import (
@@ -234,6 +235,15 @@ class AudioMorphApp(_BaseWindow):
             text_muted=TEXT_SECONDARY,
         )
 
+        from gui.viral_clipper_widget import ViralClipperWidget
+        self.viral_frame = ViralClipperWidget(
+            self,
+            settings=self.settings,
+            bg_color=BG_ROOT,
+            panel_color=BG_PANEL,
+            accent_color=ACCENT_PRIMARY,
+        )
+
     def _build_sidebar(self) -> None:
         sidebar = ctk.CTkFrame(
             self,
@@ -298,6 +308,7 @@ class AudioMorphApp(_BaseWindow):
         _add_nav("DOWNLOAD", "Media Downloader", "download", self._switch_to_download)
 
         _group_header("CREATIVE & AI STUDIO")
+        _add_nav("VIRAL_CLIPPER", "Viral Clipper", "clipper", self._switch_to_viral_clipper)
         _add_nav("WATERMARK", "Watermark Studio", "watermark", self._switch_to_watermark)
         _add_nav("CUT", "Cut & Trim Audio", "cut", self._switch_to_cutter)
         _add_nav("SUBTITLES", "AI Subtitles", "subtitles", self._switch_to_subtitles)
@@ -311,7 +322,7 @@ class AudioMorphApp(_BaseWindow):
             text="Obsidian Edition • FFmpeg Ready",
             font=(FONT_FAMILY, 10),
             text_color=TEXT_MUTED,
-        ).pack(side="bottom", pady=10)
+        ).pack(side="bottom", pady=(6, 18))
 
     def _build_center_workspace(self) -> None:
         self.center_container = ctk.CTkFrame(self, fg_color=BG_ROOT)
@@ -412,7 +423,7 @@ class AudioMorphApp(_BaseWindow):
         # ── Standard Queue Workspace (CONVERT / DOWNLOAD / AI_TOOLS) ─
         self.queue_frame = ctk.CTkFrame(self.center_container, fg_color="transparent")
         self.queue_frame.grid(row=1, column=0, sticky="nsew")
-        self.queue_frame.grid_rowconfigure(1, weight=1)
+        self.queue_frame.grid_rowconfigure(2, weight=1)
         self.queue_frame.grid_columnconfigure(0, weight=1)
 
         # Converter Segmented Category Bar (Audio | Video | Image | Archive)
@@ -466,7 +477,16 @@ class AudioMorphApp(_BaseWindow):
             font=(FONT_FAMILY, 12),
         )
         self.url_entry.pack(side="left", padx=(10, 8), pady=8, fill="x", expand=True)
-        self.url_entry.bind("<Return>", lambda _e: self.add_url())
+
+        def _on_url_return(_e=None):
+            if hasattr(self, "online_trimmer") and self.online_trimmer.winfo_ismapped():
+                u = self.url_entry.get().strip()
+                if u:
+                    self.online_trimmer.load_url(u)
+                    return
+            self.add_url()
+
+        self.url_entry.bind("<Return>", _on_url_return)
 
         ctk.CTkButton(
             self.dl_toolbar,
@@ -480,11 +500,37 @@ class AudioMorphApp(_BaseWindow):
             fg_color=ACCENT_PRIMARY,
             hover_color=ACCENT_HOVER,
             command=self.add_url,
-        ).pack(side="left", padx=(0, 10), pady=8)
+        ).pack(side="left", padx=(0, 6), pady=8)
+
+        self.btn_dl_trim = ctk.CTkButton(
+            self.dl_toolbar,
+            text="Trim Segment",
+            image=get_icon("trim", size=14, color=TEXT_PRIMARY, accent=ACCENT_TEXT),
+            compound="left",
+            height=38,
+            width=132,
+            corner_radius=9,
+            font=(FONT_FAMILY, 12, "bold"),
+            fg_color=BG_CARD,
+            hover_color=BG_CARD_HOVER,
+            border_width=1,
+            border_color=BORDER_SUBTLE,
+            command=self._toggle_online_trimmer,
+        )
+        self.btn_dl_trim.pack(side="left", padx=(0, 10), pady=8)
+
+        # Embedded Online Stream Trimmer Drawer (hidden by default)
+        from gui.online_trimmer_widget import OnlineTrimmerDrawer
+        self.online_trimmer = OnlineTrimmerDrawer(
+            self.queue_frame,
+            on_download_segment=self._on_download_trimmed_segment,
+            on_close=self._hide_online_trimmer,
+            get_url_fn=lambda: self.url_entry.get().strip(),
+        )
 
         # Body container: toggles between EmptyDropzoneHero and ModernQueueList
         self.queue_body = ctk.CTkFrame(self.queue_frame, fg_color="transparent")
-        self.queue_body.grid(row=1, column=0, sticky="nsew")
+        self.queue_body.grid(row=2, column=0, sticky="nsew")
         self.queue_body.grid_rowconfigure(0, weight=1)
         self.queue_body.grid_columnconfigure(0, weight=1)
 
@@ -527,7 +573,7 @@ class AudioMorphApp(_BaseWindow):
 
         # Status / speed readout bar under queue
         self.status_frame = ctk.CTkFrame(self.queue_frame, fg_color="transparent", height=24)
-        self.status_frame.grid(row=2, column=0, sticky="ew", pady=(6, 0))
+        self.status_frame.grid(row=3, column=0, sticky="ew", pady=(6, 0))
         self.speed_label = ctk.CTkLabel(
             self.status_frame, text="", font=(FONT_MONO, 10), text_color=TEXT_SECONDARY
         )
@@ -745,7 +791,7 @@ class AudioMorphApp(_BaseWindow):
             wraplength=240,
         )
 
-        # Clean progress bar housed inside right export dock
+        # Clean progress bar housed inside right export dock (hidden when idle)
         self.total_progress = ctk.CTkProgressBar(
             self.right_footer,
             height=6,
@@ -753,7 +799,6 @@ class AudioMorphApp(_BaseWindow):
             progress_color=ACCENT_PRIMARY,
             fg_color=BG_CARD,
         )
-        self.total_progress.grid(row=2, column=0, padx=14, pady=(6, 8), sticky="ew")
         self.total_progress.set(0)
 
         # Primary Action & Cancel Buttons pinned cleanly at bottom
@@ -873,7 +918,8 @@ class AudioMorphApp(_BaseWindow):
         self.completion_banner.grid_remove()
 
     def _hide_full_frames(self) -> None:
-        for attr in ("cutter_frame", "subtitle_frame", "bg_frame", "vocal_frame", "watermark_frame"):
+        self._hide_online_trimmer()
+        for attr in ("cutter_frame", "subtitle_frame", "bg_frame", "vocal_frame", "watermark_frame", "viral_frame"):
             frame = getattr(self, attr, None)
             if frame is None:
                 continue
@@ -1046,6 +1092,108 @@ class AudioMorphApp(_BaseWindow):
 
         self._on_watermark_queue_changed(len(self.watermark_frame.get_video_queue()))
 
+    def _switch_to_viral_clipper(self) -> None:
+        if self.current_mode == "VIRAL_CLIPPER":
+            return
+        self.current_mode = "VIRAL_CLIPPER"
+        self._set_active_nav("VIRAL_CLIPPER")
+        self._show_fullscreen_tool(self.viral_frame)
+
+    def _toggle_online_trimmer(self) -> None:
+        if hasattr(self, "online_trimmer"):
+            if not self.online_trimmer.winfo_ismapped():
+                self._show_online_trimmer()
+            else:
+                url = self.url_entry.get().strip()
+                if url and (not self.online_trimmer.stream_info or self.online_trimmer.stream_info.url != url):
+                    self.online_trimmer.load_url(url)
+                else:
+                    self._hide_online_trimmer()
+
+    def _show_online_trimmer(self) -> None:
+        if hasattr(self, "online_trimmer"):
+            self.online_trimmer.grid(row=1, column=0, sticky="ew", pady=(0, 10))
+            if hasattr(self, "btn_dl_trim"):
+                self.btn_dl_trim.configure(fg_color=ACCENT_PRIMARY, text_color=TEXT_PRIMARY)
+            url = self.url_entry.get().strip()
+            if url:
+                self.online_trimmer.load_url(url)
+
+    def _hide_online_trimmer(self) -> None:
+        if hasattr(self, "online_trimmer"):
+            if hasattr(self.online_trimmer, "stop_playback"):
+                self.online_trimmer.stop_playback()
+            if self.online_trimmer.winfo_ismapped():
+                self.online_trimmer.grid_remove()
+        if hasattr(self, "btn_dl_trim"):
+            self.btn_dl_trim.configure(fg_color=BG_CARD, text_color=TEXT_PRIMARY)
+
+    def _on_download_trimmed_segment(
+        self, url: str, start_sec: float, end_sec: float, stream_info: StreamMetadata
+    ) -> None:
+        if hasattr(self, "online_trimmer") and hasattr(self.online_trimmer, "stop_playback"):
+            self.online_trimmer.stop_playback()
+
+        out_dir = self.settings.get("download_output_dir", os.path.expanduser("~\\Downloads"))
+        format_choice = self.format_menu.get() if hasattr(self, "format_menu") else "MP4"
+        quality_choice = self.quality_menu.get() if hasattr(self, "quality_menu") else "Best Available"
+        dur_str = format_seconds(end_sec - start_sec)
+        title = stream_info.title if (stream_info and stream_info.title) else url
+        subtitle = f"Trimmed ({format_seconds(start_sec)} - {format_seconds(end_sec)} • {dur_str})"
+
+        idx = len(self.file_queue)
+        fake_item = f"{url}#[{start_sec:.1f}-{end_sec:.1f}]"
+        self.file_queue.append(fake_item)
+        self.queue_list.add_card(
+            title=title,
+            subtitle=subtitle,
+            badge=f"TRIM • {int(end_sec - start_sec)}s",
+        )
+        self._refresh_queue_display()
+
+        self.btn_start.grid_remove()
+        self.btn_cancel.grid(row=3, column=0, padx=14, pady=(0, 14), sticky="ew")
+        self.total_progress.grid(row=2, column=0, padx=14, pady=(6, 8), sticky="ew")
+        self.total_progress.set(0)
+        self.speed_label.configure(text=f"Downloading segment ({dur_str})…")
+        self.update_tree(idx, "Downloading segment…")
+
+        import threading
+
+        def _worker():
+            def _prog(pct: int, speed: str):
+                self.after(0, lambda p=pct, s=speed: (
+                    self.update_tree(idx, f"{p}% • {s}" if s else f"{p}%"),
+                    self.total_progress.set(p / 100.0),
+                    self.speed_label.configure(text=f"{p}% • {s}" if s else f"{p}%"),
+                ))
+
+            try:
+                out_path = download_trimmed_segment(
+                    url=url,
+                    start_sec=start_sec,
+                    end_sec=end_sec,
+                    output_dir=out_dir,
+                    format_choice=format_choice,
+                    quality_choice=quality_choice,
+                    progress_callback=_prog,
+                )
+                self._last_output_dir = out_dir
+                self.after(0, lambda p=out_path: (
+                    self.update_tree(idx, "✓ Completed"),
+                    self.total_progress.set(1.0),
+                    self._on_work_complete(),
+                ))
+            except Exception as ex:
+                log.error("Trimmed segment download error: %s", ex)
+                self.after(0, lambda e=str(ex): (
+                    self.update_tree(idx, f"✗ {e[:25]}"),
+                    self._restore_buttons(),
+                    messagebox.showerror("Download Error", f"Segment download failed:\n{e}"),
+                ))
+
+        threading.Thread(target=_worker, daemon=True).start()
+
     def _switch_to_cutter(self) -> None:
         if self.current_mode == "CUT":
             return
@@ -1146,6 +1294,9 @@ class AudioMorphApp(_BaseWindow):
             getattr(getattr(self, "watermark_frame", None), "canvas", None),
             getattr(getattr(self, "watermark_frame", None), "empty_hero", None),
             getattr(getattr(self, "watermark_frame", None), "queue_list", None),
+            getattr(self, "viral_frame", None),
+            getattr(getattr(self, "viral_frame", None), "preview_canvas", None),
+            getattr(self, "online_trimmer", None),
         ]
         for w in targets:
             if w and hasattr(w, "drop_target_register"):
@@ -1194,6 +1345,11 @@ class AudioMorphApp(_BaseWindow):
 
         if self.current_mode == "WATERMARK":
             self.watermark_frame.add_path(filepath)
+            return
+
+        if self.current_mode == "VIRAL_CLIPPER":
+            if hasattr(self, "viral_frame"):
+                self.viral_frame.load_source(filepath)
             return
 
         if filepath not in self.file_queue:
@@ -1309,6 +1465,7 @@ class AudioMorphApp(_BaseWindow):
 
         self.btn_start.grid_remove()
         self.btn_cancel.grid(row=3, column=0, padx=14, pady=(0, 14), sticky="ew")
+        self.total_progress.grid(row=2, column=0, padx=14, pady=(6, 8), sticky="ew")
         self.total_progress.set(0)
         self.speed_label.configure(text="Starting…")
 
@@ -1417,6 +1574,7 @@ class AudioMorphApp(_BaseWindow):
 
         self.btn_start.grid_remove()
         self.btn_cancel.grid(row=3, column=0, padx=14, pady=(0, 14), sticky="ew")
+        self.total_progress.grid(row=2, column=0, padx=14, pady=(6, 8), sticky="ew")
         self.total_progress.set(0)
         self.lbl_wm_status.configure(text="Starting export…", text_color=TEXT_PRIMARY)
 
@@ -1487,6 +1645,7 @@ class AudioMorphApp(_BaseWindow):
         messagebox.showinfo("Success", "All tasks finished!")
 
     def _restore_buttons(self) -> None:
+        self.total_progress.grid_remove()
         self.btn_cancel.grid_remove()
         if self.current_mode == "CONVERT":
             text = "CONVERT NOW"
@@ -1504,6 +1663,10 @@ class AudioMorphApp(_BaseWindow):
         try:
             if getattr(self, "watermark_frame", None):
                 self.watermark_frame.stop_playback()
+            if getattr(self, "viral_frame", None):
+                self.viral_frame.stop_playback()
+            if getattr(self, "online_trimmer", None) and hasattr(self.online_trimmer, "stop_playback"):
+                self.online_trimmer.stop_playback()
             if getattr(self, "cutter_frame", None):
                 self.cutter_frame.stop_audio()
             if getattr(self, "vocal_frame", None):

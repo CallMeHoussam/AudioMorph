@@ -127,6 +127,49 @@ def _draw_cut(draw: ImageDraw.ImageDraw, s: int, fg, accent) -> None:
     draw.line([(s * 0.33, s * 0.64), (s * 0.80, s * 0.32)], fill=fg, width=w)
 
 
+def _draw_clipper(draw: ImageDraw.ImageDraw, s: int, fg, accent) -> None:
+    # Lightning / scissors-spark icon for AI Viral Clipper
+    w = max(2, round(s * 0.075))
+    r = s * 0.10
+    # Left scissors handles
+    draw.ellipse([s * 0.20 - r, s * 0.30 - r, s * 0.20 + r, s * 0.30 + r], outline=fg, width=w)
+    draw.ellipse([s * 0.20 - r, s * 0.70 - r, s * 0.20 + r, s * 0.70 + r], outline=fg, width=w)
+    # Pivot joint dot
+    dr = s * 0.04
+    draw.ellipse([s * 0.40 - dr, s * 0.50 - dr, s * 0.40 + dr, s * 0.50 + dr], fill=fg)
+    # Scissor blades
+    draw.line([(s * 0.28, s * 0.34), (s * 0.72, s * 0.72)], fill=fg, width=w)
+    draw.line([(s * 0.28, s * 0.66), (s * 0.72, s * 0.28)], fill=fg, width=w)
+    # Dynamic lightning / spark bolt emerging from center
+    bolt = [
+        (s * 0.58, s * 0.15),
+        (s * 0.46, s * 0.46),
+        (s * 0.62, s * 0.46),
+        (s * 0.48, s * 0.85),
+        (s * 0.82, s * 0.42),
+        (s * 0.66, s * 0.42),
+        (s * 0.78, s * 0.15),
+    ]
+    draw.polygon(bolt, fill=accent)
+
+
+def _draw_trim(draw: ImageDraw.ImageDraw, s: int, fg, accent) -> None:
+    # Dual-range timeline trim bracket icon
+    w = max(2, round(s * 0.08))
+    # Horizontal timeline track
+    draw.line([(s * 0.15, s * 0.50), (s * 0.85, s * 0.50)], fill=fg, width=max(1, w - 1))
+    # Active range segment
+    draw.line([(s * 0.30, s * 0.50), (s * 0.70, s * 0.50)], fill=accent, width=w + 1)
+    # Left bracket handle
+    draw.line([(s * 0.30, s * 0.24), (s * 0.30, s * 0.76)], fill=accent, width=w)
+    draw.line([(s * 0.30, s * 0.24), (s * 0.40, s * 0.24)], fill=accent, width=w)
+    draw.line([(s * 0.30, s * 0.76), (s * 0.40, s * 0.76)], fill=accent, width=w)
+    # Right bracket handle
+    draw.line([(s * 0.70, s * 0.24), (s * 0.70, s * 0.76)], fill=accent, width=w)
+    draw.line([(s * 0.70, s * 0.24), (s * 0.60, s * 0.24)], fill=accent, width=w)
+    draw.line([(s * 0.70, s * 0.76), (s * 0.60, s * 0.76)], fill=accent, width=w)
+
+
 def _draw_subtitles(draw: ImageDraw.ImageDraw, s: int, fg, accent) -> None:
     w = max(2, round(s * 0.075))
     draw.rounded_rectangle([s * 0.12, s * 0.20, s * 0.88, s * 0.78], radius=s * 0.12, outline=fg, width=w)
@@ -262,6 +305,9 @@ _DRAWERS = {
     "subtitles": _draw_subtitles,
     "bg_remover": _draw_bg_remover,
     "vocal": _draw_vocal,
+    "clipper": _draw_clipper,
+    "viral": _draw_clipper,
+    "trim": _draw_trim,
     "ai_tools": _draw_ai_tools,
     "add": _draw_add,
     "folder": _draw_folder,

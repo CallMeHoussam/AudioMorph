@@ -1,12 +1,12 @@
 [Setup]
 AppName=AudioMorph Studio
-AppVersion=2.1
+AppVersion=2.2
 AppPublisher=Evoless
 DefaultDirName={autopf}\AudioMorph Studio
 DefaultGroupName=AudioMorph Studio
 AllowNoIcons=yes
 OutputDir=.
-OutputBaseFilename=AudioMorph_Setup_v2.1
+OutputBaseFilename=AudioMorph_Setup_v2.2
 SetupIconFile=icon.ico
 UninstallDisplayIcon={app}\icon.ico
 Compression=lzma2/ultra64

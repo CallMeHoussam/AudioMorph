@@ -48,6 +48,7 @@ tmp/
 *.tmp
 .cache/
 separated/
+scratch/
 download_history.json
 test_input.docx
 scratch_*.py
