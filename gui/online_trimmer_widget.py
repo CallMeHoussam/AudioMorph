@@ -94,6 +94,8 @@ class OnlineTrimmerDrawer(ctk.CTkFrame):
         self._debounce_timer: Optional[threading.Timer] = None
         self._ui_queue: queue.SimpleQueue = queue.SimpleQueue()
         self._is_loading = False
+        self._polling_active = False
+        self._active_bg_jobs = 0
 
         # Live Real-Time Stream Player Engine
         self.player = OnlineStreamPlayer(
@@ -106,7 +108,11 @@ class OnlineTrimmerDrawer(ctk.CTkFrame):
         )
 
         self._build_ui()
-        self._poll_ui_queue()
+
+    def _ensure_polling(self) -> None:
+        if not self._polling_active:
+            self._polling_active = True
+            self.after(40, self._poll_ui_queue)
 
     def _poll_ui_queue(self) -> None:
         try:
@@ -118,7 +124,11 @@ class OnlineTrimmerDrawer(ctk.CTkFrame):
                     log.debug("UI queue dispatch error: %s", ex)
         except queue.Empty:
             pass
-        self.after(40, self._poll_ui_queue)
+
+        if self._is_loading or self.player.is_playing or self._active_bg_jobs > 0 or not self._ui_queue.empty():
+            self.after(40, self._poll_ui_queue)
+        else:
+            self._polling_active = False
 
     def _queue_player_frame(self, img: Image.Image, timestamp: float) -> None:
         self._ui_queue.put(lambda: self._on_player_frame(img, timestamp))
@@ -675,6 +685,7 @@ class OnlineTrimmerDrawer(ctk.CTkFrame):
             from_t = self.current_time_sec
             if from_t >= self.total_duration - 0.5:
                 from_t = self.start_sec
+            self._ensure_polling()
             self.player.play(from_time=from_t)
 
     def _toggle_preview_cut(self) -> None:
@@ -685,6 +696,7 @@ class OnlineTrimmerDrawer(ctk.CTkFrame):
             self.player.pause()
         else:
             self.btn_preview_cut.configure(text="■ Stop Preview", fg_color=ACCENT_PRIMARY)
+            self._ensure_polling()
             self.player.play(from_time=self.start_sec, until_time=self.end_sec)
 
     def _step_time(self, delta: float) -> None:
@@ -816,6 +828,7 @@ class OnlineTrimmerDrawer(ctk.CTkFrame):
 
         self.stop_playback()
         self._is_loading = True
+        self._ensure_polling()
         self.lbl_stream_title.configure(text="⚡ Fetching stream info & buffering live preview...")
         self.lbl_stream_meta.configure(text="Resolving direct stream URL & keyframes…")
         self._draw_canvas_placeholder("⚡ Fetching stream info\n& buffering live preview...")
@@ -874,20 +887,31 @@ class OnlineTrimmerDrawer(ctk.CTkFrame):
 
         # Display remote thumbnail as immediate poster frame
         if info.thumbnail:
+            self._active_bg_jobs += 1
+            self._ensure_polling()
+
             def _thumb_worker():
-                thumb_img = fetch_remote_thumbnail(info.thumbnail, self.canvas_w, self.canvas_h)
-                if thumb_img:
-                    self._ui_queue.put(lambda: self._display_frame(thumb_img, self.current_time_sec))
+                try:
+                    thumb_img = fetch_remote_thumbnail(info.thumbnail, self.canvas_w, self.canvas_h)
+                    if thumb_img:
+                        self._ui_queue.put(lambda: self._display_frame(thumb_img, self.current_time_sec))
+                finally:
+                    self._ui_queue.put(self._decrement_bg_jobs)
 
             threading.Thread(target=_thumb_worker, daemon=True).start()
 
         # Fetch first accurate frame at current_time_sec
         self._fetch_preview_frame(self.current_time_sec)
 
+    def _decrement_bg_jobs(self) -> None:
+        self._active_bg_jobs = max(0, self._active_bg_jobs - 1)
+
     def _schedule_debounce_frame_fetch(self, timestamp: float) -> None:
         if self._debounce_timer is not None:
             self._debounce_timer.cancel()
-        self._debounce_timer = threading.Timer(0.18, lambda: self._fetch_preview_frame(timestamp))
+        self._debounce_timer = threading.Timer(
+            0.18, lambda: self.after(0, lambda: self._fetch_preview_frame(timestamp))
+        )
         self._debounce_timer.daemon = True
         self._debounce_timer.start()
 
@@ -899,11 +923,16 @@ class OnlineTrimmerDrawer(ctk.CTkFrame):
             return
 
         cw, ch = self.canvas_w, self.canvas_h
+        self._active_bg_jobs += 1
+        self._ensure_polling()
 
         def _worker():
-            img = extract_remote_frame(stream_url, timestamp, target_w=cw, target_h=ch)
-            if img:
-                self._ui_queue.put(lambda: self._display_frame(img, timestamp))
+            try:
+                img = extract_remote_frame(stream_url, timestamp, target_w=cw, target_h=ch)
+                if img:
+                    self._ui_queue.put(lambda: self._display_frame(img, timestamp))
+            finally:
+                self._ui_queue.put(self._decrement_bg_jobs)
 
         threading.Thread(target=_worker, daemon=True).start()
 

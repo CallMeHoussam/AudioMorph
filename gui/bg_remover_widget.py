@@ -1,9 +1,12 @@
 import os
-import subprocess
-import threading
+import shutil
 import tempfile
-import customtkinter as ctk
+import threading
 from tkinter import filedialog, messagebox
+
+import customtkinter as ctk
+
+from core.ai_worker import check_ai_backend_available
 
 try:
     from PIL import Image, ImageTk, ImageDraw
@@ -19,8 +22,8 @@ class BgRemoverWidget(ctk.CTkFrame):
         
         self.filepath = None
         self.output_path = None
-        self.temp_dir = tempfile.mkdtemp(prefix="audiomorph_bg_")
-        
+        self.temp_dir = None
+
         # Slider state
         self.slider_pos = 0.5  # 0.0 to 1.0
         self.img_before_pil = None
@@ -28,8 +31,18 @@ class BgRemoverWidget(ctk.CTkFrame):
         self.canvas_w = 800
         self.canvas_h = 500
         self.photo_cache = None
-        
+
         self._build_ui()
+
+    def _ensure_temp_dir(self) -> str:
+        if not self.temp_dir or not os.path.isdir(self.temp_dir):
+            self.temp_dir = tempfile.mkdtemp(prefix="audiomorph_bg_")
+        return self.temp_dir
+
+    def cleanup(self) -> None:
+        if self.temp_dir and os.path.isdir(self.temp_dir):
+            shutil.rmtree(self.temp_dir, ignore_errors=True)
+            self.temp_dir = None
 
     def _build_ui(self):
         self.grid_rowconfigure(1, weight=1)
@@ -102,32 +115,34 @@ class BgRemoverWidget(ctk.CTkFrame):
     # ── AI Generation ────────────────────────────────────────────────
 
     def generate_mask(self):
-        if not self.filepath: return
+        if not self.filepath:
+            return
         self.btn_generate.configure(state="disabled", text="PROCESSING...")
         self.lbl_status.configure(text="Running Rembg...")
-        
+
         out_filename = "bg_removed.png"
-        self.output_path = os.path.join(self.temp_dir, out_filename)
-            
+        self.output_path = os.path.join(self._ensure_temp_dir(), out_filename)
+
         threading.Thread(target=self._run_rembg_backend, daemon=True).start()
 
     def _run_rembg_backend(self):
         try:
-            from rembg import remove
             from PIL import Image
-            
-            input_img = Image.open(self.filepath)
-            output_img = remove(input_img)
-            output_img.save(self.output_path)
+            from rembg import remove
+
+            with Image.open(self.filepath) as input_img:
+                output_img = remove(input_img)
+                output_img.save(self.output_path)
 
             if not os.path.exists(self.output_path):
-                raise Exception("Generation completed but PNG not found.")
-                
+                raise RuntimeError("Generation completed but PNG not found.")
+
             self.img_after_pil = output_img.convert("RGBA")
             self.after(0, self._on_generation_success)
-            
+
         except ImportError:
-            self.after(0, self._on_generation_error, "rembg not found. Please run 'pip install rembg'")
+            _, _, msg = check_ai_backend_available("rembg")
+            self.after(0, self._on_generation_error, msg)
         except Exception as e:
             self.after(0, self._on_generation_error, str(e))
 

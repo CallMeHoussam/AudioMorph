@@ -1845,3 +1845,7 @@ class WatermarkEditorWidget(ctk.CTkFrame):
     def get_video_queue(self) -> list[str]:
         """Return the ordered list of queued video file paths."""
         return list(self.video_queue)
+
+    def cleanup(self) -> None:
+        """Stop playback and release any active video stream handles."""
+        self.stop_playback()

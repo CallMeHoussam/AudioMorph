@@ -136,6 +136,7 @@ class WatermarkWorker(threading.Thread):
                 known_duration=info.duration,
                 needs_even_pad=(info.width % 2 != 0 or info.height % 2 != 0),
                 progress_callback=_on_prog,
+                use_hw=bool(self.export_settings.get("hardware_accel", True)),
             )
 
             if self.is_cancelled:

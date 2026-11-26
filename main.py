@@ -21,19 +21,33 @@ log = get_logger("audiomorph")
 
 
 def _try_update_ytdlp() -> None:
-    """Best-effort background update of yt-dlp (non-blocking)."""
+    """Best-effort background update of yt-dlp throttled to once every 7 days."""
     if getattr(sys, "frozen", False):
         log.info("Running as frozen app — skipping auto-update.")
         return
-        
+
     try:
+        import time
+        from utils.config import load_settings, save_settings
+
+        settings = load_settings()
+        last_check = float(settings.get("last_ytdlp_check", 0.0) or 0.0)
+        now = time.time()
+        if now - last_check < 7 * 86400:
+            log.debug("yt-dlp update check throttled (last checked %.1f days ago).", (now - last_check) / 86400.0)
+            return
+
         import subprocess
+        creationflags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
         subprocess.run(
             [sys.executable, "-m", "pip", "install", "--upgrade", "yt-dlp"],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
             timeout=30,
+            creationflags=creationflags,
         )
+        settings["last_ytdlp_check"] = now
+        save_settings(settings)
         log.info("yt-dlp auto-update check completed.")
     except Exception as exc:
         log.debug("yt-dlp auto-update skipped: %s", exc)

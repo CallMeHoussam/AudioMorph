@@ -20,7 +20,7 @@ from core.online_trimmer import format_seconds
 from core.video_preview import probe_video
 from core.viral_clipper import SubtitleBlock, ViralClip
 from core.watermark_renderer import compute_watermark_xy, render_watermark_rgba
-from utils.config import get_ffmpeg_path, load_settings
+from utils.config import get_ffmpeg_path, get_video_encoder_args, load_settings
 from utils.logger import get_logger
 
 log = get_logger(__name__)
@@ -314,32 +314,31 @@ class ViralExportWorker(threading.Thread):
         # Final map tag
         filtergraph = ";".join(filter_parts)
 
-        # 3. Construct FFmpeg command
+        # 3. Construct FFmpeg command (use HW accel if enabled, fallback to libx264 on error)
         ffmpeg_exe = get_ffmpeg_path()
-        cmd = [ffmpeg_exe, "-y"]
+        use_hw = bool(app_cfg.get("hardware_accel", True))
+        enc_name, v_enc_args = get_video_encoder_args(use_hw=use_hw, crf=18, preset="medium")
 
-        if not self.is_url_source:
-            # Cut with input seeking from the local stream
-            cmd.extend(["-ss", f"{clip.start_sec:.3f}", "-t", f"{clip.duration_sec:.3f}"])
-        cmd.extend(["-i", local_src])
+        def _build_clip_cmd(video_args: list[str]) -> list[str]:
+            c = [ffmpeg_exe, "-y"]
+            if not self.is_url_source:
+                c.extend(["-ss", f"{clip.start_sec:.3f}", "-t", f"{clip.duration_sec:.3f}"])
+            c.extend(["-i", local_src])
+            if tmp_wm_path:
+                c.extend(["-i", tmp_wm_path])
+            c.extend([
+                "-filter_complex", filtergraph,
+                "-map", last_v_tag,
+                "-map", "0:a:0?",
+                *video_args,
+                "-c:a", "aac",
+                "-b:a", "192k",
+                "-movflags", "+faststart",
+                out_path,
+            ])
+            return c
 
-        if tmp_wm_path:
-            cmd.extend(["-i", tmp_wm_path])
-
-        cmd.extend([
-            "-filter_complex", filtergraph,
-            "-map", last_v_tag,
-            "-map", "0:a:0?",
-            "-c:v", "libx264",
-            "-crf", "18",
-            "-preset", "medium",
-            "-pix_fmt", "yuv420p",
-            "-c:a", "aac",
-            "-b:a", "192k",
-            out_path,
-        ])
-
-        try:
+        def _run_clip_cmd(cmd: list[str]) -> int:
             log.info("Executing viral clip export: %s", " ".join(cmd[:10]))
             with self._lock:
                 self._current_proc = subprocess.Popen(
@@ -367,7 +366,14 @@ class ViralExportWorker(threading.Thread):
                         self._emit_total_progress()
 
             self._current_proc.wait()
-            rc = self._current_proc.returncode
+            return self._current_proc.returncode
+
+        try:
+            rc = _run_clip_cmd(_build_clip_cmd(v_enc_args))
+            if rc != 0 and not self.is_cancelled and enc_name != "libx264":
+                log.warning("Hardware encoder %s failed on viral clip; retrying with libx264.", enc_name)
+                _, sw_args = get_video_encoder_args(use_hw=False, crf=18, preset="medium")
+                rc = _run_clip_cmd(_build_clip_cmd(sw_args))
 
             if self.is_cancelled or rc != 0 or not os.path.exists(out_path):
                 if os.path.exists(out_path):

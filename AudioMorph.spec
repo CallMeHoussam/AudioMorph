@@ -50,7 +50,6 @@ hiddenimports = [
     'core.viral_clipper',
     'core.viral_export_worker',
     'core.worker',
-    'core.universal_engine',
     'core.downloader',
     'core.download_worker',
     'core.ai_worker',

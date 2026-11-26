@@ -1,7 +1,9 @@
 import os
+import shutil
 import subprocess
 import struct
 import math
+import tempfile
 import customtkinter as ctk
 from tkinter import filedialog, messagebox, Canvas
 import threading
@@ -9,11 +11,14 @@ import time
 
 try:
     import pygame
-    pygame.mixer.init()
+    if not pygame.mixer.get_init():
+        pygame.mixer.init()
 except ImportError:
     pass
 
 from utils.config import get_ffmpeg_path
+
+_CREATE_NO_WINDOW = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
 
 class AudioCutterWidget(ctk.CTkFrame):
     def __init__(self, master, bg_color="#0D0D10", panel_color="#15151A", accent_color="#4B197A", **kwargs):
@@ -24,27 +29,43 @@ class AudioCutterWidget(ctk.CTkFrame):
         self.accent_color = accent_color
         
         self.filepath = None
+        self.temp_dir = None
         self.duration = 0.0
         self.waveform_data = []
-        
+
         self.playing = False
-        self.play_start_time = 0.0 # Global time when play started
+        self.play_start_time = 0.0  # Global time when play started
         self.last_mixer_time = -1
-        
+
         self.trim_start = 0.0
-        self.trim_end = 1.0 # Will scale to duration later
-        
+        self.trim_end = 1.0  # Will scale to duration later
+
         self.zoom = 1.0
         self.scroll_x = 0.0
-        
+
         # UI State variables
         self.is_dragging_start = False
         self.is_dragging_end = False
         self.is_scrubbing = False
         self.current_time_var = ctk.StringVar(value="00:00 / 00:00")
-        
+        self._timer_active = False
+
         self._build_ui()
-        self.update_timer()
+
+    def _ensure_temp_dir(self) -> str:
+        if not self.temp_dir or not os.path.isdir(self.temp_dir):
+            self.temp_dir = tempfile.mkdtemp(prefix="audiomorph_cut_")
+        return self.temp_dir
+
+    def cleanup(self) -> None:
+        self.stop_audio()
+        try:
+            pygame.mixer.music.unload()
+        except Exception:
+            pass
+        if self.temp_dir and os.path.isdir(self.temp_dir):
+            shutil.rmtree(self.temp_dir, ignore_errors=True)
+            self.temp_dir = None
 
     def _build_ui(self):
         self.grid_rowconfigure(1, weight=1)
@@ -188,14 +209,16 @@ class AudioCutterWidget(ctk.CTkFrame):
         try:
             pygame.mixer.music.load(self.filepath)
         except Exception:
-            # Fallback: create temporary wav
-            temp_wav = os.path.join(os.path.dirname(self.filepath), "temp_audiomorph_playback.wav")
-            # Clear it if exists
-            if os.path.exists(temp_wav): os.remove(temp_wav)
-            subprocess.run([self.ffmpeg_exe, "-i", self.filepath, "-y", temp_wav], 
-                           creationflags=subprocess.CREATE_NO_WINDOW, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            temp_wav = os.path.join(self._ensure_temp_dir(), "temp_audiomorph_playback.wav")
+            if os.path.exists(temp_wav):
+                os.remove(temp_wav)
+            subprocess.run(
+                [self.ffmpeg_exe, "-i", self.filepath, "-y", temp_wav],
+                creationflags=_CREATE_NO_WINDOW, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            )
             pygame.mixer.music.load(temp_wav)
-            
+
+        self._refresh_time_label()
         self.draw_waveform()
 
     # ── Drawing ──────────────────────────────────────────────────────────
@@ -410,22 +433,33 @@ class AudioCutterWidget(ctk.CTkFrame):
                 pygame.mixer.music.play()
                 
             self.playing = True
+            self._start_timer()
 
     def stop_audio(self):
         if self.playing:
             pygame.mixer.music.stop()
             self.playing = False
+        self._timer_active = False
 
-    def update_timer(self):
+    def _refresh_time_label(self) -> float:
         t = self.get_current_time()
         m1, s1 = divmod(t, 60)
         m2, s2 = divmod(self.duration, 60)
         self.current_time_var.set(f"{int(m1):02d}:{s1:04.1f} / {int(m2):02d}:{s2:04.1f}")
-        
+        return t
+
+    def _start_timer(self) -> None:
+        if not self._timer_active:
+            self._timer_active = True
+            self.update_timer()
+
+    def update_timer(self):
+        self._refresh_time_label()
         if self.playing:
             self.draw_waveform()
-            
-        self.after(50, self.update_timer)
+            self.after(50, self.update_timer)
+        else:
+            self._timer_active = False
 
     # ── Export ───────────────────────────────────────────────────────────
 
@@ -451,7 +485,7 @@ class AudioCutterWidget(ctk.CTkFrame):
                     "-c:a", "libmp3lame" if save_path.endswith(".mp3") else "pcm_s16le", 
                     save_path
                 ]
-                subprocess.run(cmd, check=True, creationflags=subprocess.CREATE_NO_WINDOW)
+                subprocess.run(cmd, check=True, creationflags=_CREATE_NO_WINDOW)
                 self.after(0, lambda: messagebox.showinfo("Success", "Audio exported securely!"))
             except Exception as e:
                 self.after(0, lambda: messagebox.showerror("Error", f"Failed to export: {e}"))

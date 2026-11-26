@@ -133,8 +133,8 @@ class DownloadWorker(threading.Thread):
                 try:
                     with open(history_file, "r", encoding="utf-8") as f:
                         history = json.load(f)
-                except Exception:
-                    pass
+                except Exception as exc:
+                    log.debug("Could not parse existing download history: %s", exc)
             history.append(entry)
             with open(history_file, "w", encoding="utf-8") as f:
                 json.dump(history, f, indent=4)

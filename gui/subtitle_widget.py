@@ -1,13 +1,17 @@
 import os
-import subprocess
-import threading
-import tempfile
-import shutil
 import re
-import customtkinter as ctk
+import shutil
+import subprocess
+import tempfile
+import threading
 from tkinter import filedialog, messagebox
 
+import customtkinter as ctk
+
+from core.ai_worker import check_ai_backend_available
 from utils.config import get_ffmpeg_path
+
+_CREATE_NO_WINDOW = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
 
 class SubtitleWidget(ctk.CTkFrame):
     def __init__(self, master, bg_color="#0D0D10", panel_color="#15151A", accent_color="#4B197A", **kwargs):
@@ -18,10 +22,20 @@ class SubtitleWidget(ctk.CTkFrame):
         self.accent_color = accent_color
         
         self.filepath = None
-        self.subs_data = [] # List of dicts: {'id': int, 'start': str, 'end': str, 'text': StringVar}
-        self.temp_dir = tempfile.mkdtemp(prefix="audiomorph_subs_")
-        
+        self.subs_data = []  # List of dicts: {'id': int, 'start': str, 'end': str, 'text': StringVar}
+        self.temp_dir = None
+
         self._build_ui()
+
+    def _ensure_temp_dir(self) -> str:
+        if not self.temp_dir or not os.path.isdir(self.temp_dir):
+            self.temp_dir = tempfile.mkdtemp(prefix="audiomorph_subs_")
+        return self.temp_dir
+
+    def cleanup(self) -> None:
+        if self.temp_dir and os.path.isdir(self.temp_dir):
+            shutil.rmtree(self.temp_dir, ignore_errors=True)
+            self.temp_dir = None
 
     def _build_ui(self):
         self.grid_rowconfigure(1, weight=1)
@@ -101,28 +115,32 @@ class SubtitleWidget(ctk.CTkFrame):
     # ── AI Generation ────────────────────────────────────────────────
 
     def generate_subtitles(self):
-        if not self.filepath: return
+        if not self.filepath:
+            return
         self.btn_generate.configure(state="disabled", text="PROCESSING (Local AI)...")
         self.lbl_status.configure(text="Running Whisper AI...")
-        
-        # Ensure older files are cleaned
-        for f in os.listdir(self.temp_dir):
-            os.remove(os.path.join(self.temp_dir, f))
-            
+
+        tdir = self._ensure_temp_dir()
+        for f in os.listdir(tdir):
+            os.remove(os.path.join(tdir, f))
+
         threading.Thread(target=self._run_whisper_backend, daemon=True).start()
 
     def _run_whisper_backend(self):
         try:
-            import sys, shutil, importlib.util
+            ok, cmd_prefix, msg = check_ai_backend_available("whisper", cli_name="whisper")
+            if not ok or not cmd_prefix:
+                raise FileNotFoundError(msg)
+
             env = os.environ.copy()
-            env["PATH"] = f"{os.path.dirname(self.ffmpeg_exe)};{env.get('PATH', '')}"
+            env["PATH"] = f"{os.path.dirname(self.ffmpeg_exe)}{os.pathsep}{env.get('PATH', '')}"
             env["PYTHONIOENCODING"] = "utf-8"
             env["PYTHONUTF8"] = "1"
-            
+
             raw_model = self.model_menu.get().split()[0]
             raw_lang = self.lang_menu.get()
             raw_task = self.task_menu.get()
-            
+
             lang_code_map = {
                 "Moroccan Darija (الدارجة)": "ar",
                 "Arabic (العربية الفصحى)": "ar",
@@ -134,17 +152,18 @@ class SubtitleWidget(ctk.CTkFrame):
                 "Turkish": "tr",
             }
             lang_code = lang_code_map.get(raw_lang, None)
-            
+
+            tdir = self._ensure_temp_dir()
             whisper_args = [
                 self.filepath,
                 "--model", raw_model,
-                "--output_dir", self.temp_dir,
-                "--output_format", "srt"
+                "--output_dir", tdir,
+                "--output_format", "srt",
             ]
 
             if "Translate" in raw_task:
                 whisper_args.extend(["--task", "translate"])
-            
+
             if lang_code:
                 whisper_args.extend(["--language", lang_code])
                 if raw_lang == "Moroccan Darija (الدارجة)":
@@ -152,39 +171,40 @@ class SubtitleWidget(ctk.CTkFrame):
                 elif raw_lang == "Arabic (العربية الفصحى)":
                     whisper_args.extend(["--initial_prompt", "نصوص عربية دقيقة بأسلوب فصيح وواضح."])
 
-            if importlib.util.find_spec("whisper") is not None:
-                cmd = [sys.executable, "-m", "whisper"] + whisper_args
-            elif shutil.which("whisper"):
-                cmd = ["whisper"] + whisper_args
-            else:
-                raise FileNotFoundError("Whisper module not found")
+            cmd = [*cmd_prefix, *whisper_args]
+            p = subprocess.Popen(
+                cmd,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                creationflags=_CREATE_NO_WINDOW,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+            )
 
-            p = subprocess.Popen(cmd, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, creationflags=subprocess.CREATE_NO_WINDOW, text=True, encoding="utf-8", errors="replace")
-            
-            # Simple progress log intercept
             for line in p.stdout:
-                if "]" in line and "-->" in line: # e.g. [00:00.000 --> 00:02.000] Transcribing...
+                if "]" in line and "-->" in line:
                     self.after(0, self.lbl_status.configure, {"text": "Transcribing... " + line[1:13]})
             p.wait()
-            
+
             if p.returncode != 0:
-                raise Exception("Whisper failed. Are you sure you ran `pip install openai-whisper`?")
-                
-            # Find the output .srt
+                raise RuntimeError("Whisper execution failed. Verify openai-whisper and PyTorch are installed correctly.")
+
             srt_file = None
-            for f in os.listdir(self.temp_dir):
+            for f in os.listdir(tdir):
                 if f.endswith(".srt"):
-                    srt_file = os.path.join(self.temp_dir, f)
+                    srt_file = os.path.join(tdir, f)
                     break
-                    
+
             if not srt_file:
-                raise Exception("Generation completed but .srt not found.")
-                
+                raise RuntimeError("Generation completed but .srt not found.")
+
             self._parse_srt(srt_file)
             self.after(0, self._on_generation_success)
-            
-        except FileNotFoundError:
-            self.after(0, self._on_generation_error, "Whisper CLI not found. Please run 'pip install openai-whisper'")
+
+        except FileNotFoundError as exc:
+            self.after(0, self._on_generation_error, str(exc))
         except Exception as e:
             self.after(0, self._on_generation_error, str(e))
 
@@ -285,14 +305,13 @@ class SubtitleWidget(ctk.CTkFrame):
         if not save_path: return
         
         # Save temporary reliable SRT, ffmpeg subtitle filter needs normalized paths
-        temp_srt = os.path.join(self.temp_dir, "burn_target.srt")
+        temp_srt = os.path.join(self._ensure_temp_dir(), "burn_target.srt")
         with open(temp_srt, 'w', encoding='utf-8') as f:
             f.write(self._get_current_srt_content())
             
         def _do_burn():
             self.after(0, self.lbl_status.configure, {"text": "Burning subtitles into video..."})
             try:
-                # ffmpeg requires escaped paths for subtitle filter
                 escaped_srt = temp_srt.replace('\\', '/').replace(':', '\\:')
                 cmd = [
                     self.ffmpeg_exe, "-y", "-i", self.filepath,
@@ -300,7 +319,7 @@ class SubtitleWidget(ctk.CTkFrame):
                     "-c:a", "copy",
                     save_path
                 ]
-                subprocess.run(cmd, check=True, creationflags=subprocess.CREATE_NO_WINDOW)
+                subprocess.run(cmd, check=True, creationflags=_CREATE_NO_WINDOW)
                 self.after(0, lambda: messagebox.showinfo("Success", "Video with burned subtitles exported!"))
             except Exception as e:
                 self.after(0, lambda: messagebox.showerror("Render Error", f"Failed to burn subtitles: {e}"))

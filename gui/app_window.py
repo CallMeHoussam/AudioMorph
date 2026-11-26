@@ -202,47 +202,86 @@ class AudioMorphApp(_BaseWindow):
         self._build_center_workspace()
         self._build_right_export_panel()
 
-        # ── Specialized Full / Studio Views (Hidden by default) ──────
-        from gui.cutter_widget import AudioCutterWidget
-        self.cutter_frame = AudioCutterWidget(
-            self, bg_color=BG_ROOT, panel_color=BG_PANEL, accent_color=ACCENT_PRIMARY
-        )
+        # Lazy-initialized full-screen/studio views (created on first navigation click)
+        self.cutter_frame = None
+        self.subtitle_frame = None
+        self.bg_frame = None
+        self.vocal_frame = None
+        self.watermark_frame = None
+        self.viral_frame = None
 
-        from gui.subtitle_widget import SubtitleWidget
-        self.subtitle_frame = SubtitleWidget(
-            self, bg_color=BG_ROOT, panel_color=BG_PANEL, accent_color=ACCENT_PRIMARY
-        )
+    def _get_cutter_frame(self):
+        if self.cutter_frame is None:
+            from gui.cutter_widget import AudioCutterWidget
+            self.cutter_frame = AudioCutterWidget(
+                self, bg_color=BG_ROOT, panel_color=BG_PANEL, accent_color=ACCENT_PRIMARY
+            )
+            self._register_dnd_targets([self.cutter_frame])
+        return self.cutter_frame
 
-        from gui.bg_remover_widget import BgRemoverWidget
-        self.bg_frame = BgRemoverWidget(
-            self, bg_color=BG_ROOT, panel_color=BG_PANEL, accent_color=ACCENT_PRIMARY
-        )
+    def _get_subtitle_frame(self):
+        if self.subtitle_frame is None:
+            from gui.subtitle_widget import SubtitleWidget
+            self.subtitle_frame = SubtitleWidget(
+                self, bg_color=BG_ROOT, panel_color=BG_PANEL, accent_color=ACCENT_PRIMARY
+            )
+            self._register_dnd_targets([self.subtitle_frame])
+        return self.subtitle_frame
 
-        from gui.vocal_isolation_widget import VocalIsolationWidget
-        self.vocal_frame = VocalIsolationWidget(
-            self, bg_color=BG_ROOT, panel_color=BG_PANEL, accent_color=ACCENT_PRIMARY
-        )
+    def _get_bg_frame(self):
+        if self.bg_frame is None:
+            from gui.bg_remover_widget import BgRemoverWidget
+            self.bg_frame = BgRemoverWidget(
+                self, bg_color=BG_ROOT, panel_color=BG_PANEL, accent_color=ACCENT_PRIMARY
+            )
+            self._register_dnd_targets([self.bg_frame])
+        return self.bg_frame
 
-        from gui.watermark_widget import WatermarkEditorWidget
-        self.watermark_frame = WatermarkEditorWidget(
-            self.center_container,
-            settings=self.settings,
-            on_queue_changed=self._on_watermark_queue_changed,
-            bg_color=BG_ROOT,
-            panel_color=BG_PANEL,
-            accent_color=ACCENT_PRIMARY,
-            text_main=TEXT_PRIMARY,
-            text_muted=TEXT_SECONDARY,
-        )
+    def _get_vocal_frame(self):
+        if self.vocal_frame is None:
+            from gui.vocal_isolation_widget import VocalIsolationWidget
+            self.vocal_frame = VocalIsolationWidget(
+                self, bg_color=BG_ROOT, panel_color=BG_PANEL, accent_color=ACCENT_PRIMARY
+            )
+            self._register_dnd_targets([self.vocal_frame])
+        return self.vocal_frame
 
-        from gui.viral_clipper_widget import ViralClipperWidget
-        self.viral_frame = ViralClipperWidget(
-            self,
-            settings=self.settings,
-            bg_color=BG_ROOT,
-            panel_color=BG_PANEL,
-            accent_color=ACCENT_PRIMARY,
-        )
+    def _get_watermark_frame(self):
+        if self.watermark_frame is None:
+            from gui.watermark_widget import WatermarkEditorWidget
+            self.watermark_frame = WatermarkEditorWidget(
+                self.center_container,
+                settings=self.settings,
+                on_queue_changed=self._on_watermark_queue_changed,
+                bg_color=BG_ROOT,
+                panel_color=BG_PANEL,
+                accent_color=ACCENT_PRIMARY,
+                text_main=TEXT_PRIMARY,
+                text_muted=TEXT_SECONDARY,
+            )
+            self._register_dnd_targets([
+                self.watermark_frame,
+                getattr(self.watermark_frame, "canvas", None),
+                getattr(self.watermark_frame, "empty_hero", None),
+                getattr(self.watermark_frame, "queue_list", None),
+            ])
+        return self.watermark_frame
+
+    def _get_viral_frame(self):
+        if self.viral_frame is None:
+            from gui.viral_clipper_widget import ViralClipperWidget
+            self.viral_frame = ViralClipperWidget(
+                self,
+                settings=self.settings,
+                bg_color=BG_ROOT,
+                panel_color=BG_PANEL,
+                accent_color=ACCENT_PRIMARY,
+            )
+            self._register_dnd_targets([
+                self.viral_frame,
+                getattr(self.viral_frame, "preview_canvas", None),
+            ])
+        return self.viral_frame
 
     def _build_sidebar(self) -> None:
         sidebar = ctk.CTkFrame(
@@ -665,6 +704,61 @@ class AudioMorphApp(_BaseWindow):
             height=34,
         )
 
+        # Audio Converter fine-tuning controls
+        self.lbl_sample_rate = ctk.CTkLabel(
+            self.right_top_panel, text="SAMPLE RATE", font=(FONT_FAMILY, 10, "bold"), text_color=TEXT_SECONDARY
+        )
+        self.sample_rate_menu = ctk.CTkOptionMenu(
+            self.right_top_panel,
+            values=["44100 Hz", "48000 Hz", "32000 Hz", "22050 Hz"],
+            fg_color=BG_CARD,
+            button_color=BG_CARD_HOVER,
+            button_hover_color=ACCENT_PRIMARY,
+            corner_radius=RADIUS_BTN,
+            height=32,
+        )
+        self.lbl_channels = ctk.CTkLabel(
+            self.right_top_panel, text="CHANNELS", font=(FONT_FAMILY, 10, "bold"), text_color=TEXT_SECONDARY
+        )
+        self.channels_menu = ctk.CTkOptionMenu(
+            self.right_top_panel,
+            values=["Stereo", "Mono"],
+            fg_color=BG_CARD,
+            button_color=BG_CARD_HOVER,
+            button_hover_color=ACCENT_PRIMARY,
+            corner_radius=RADIUS_BTN,
+            height=32,
+        )
+        self.normalize_audio_var = ctk.BooleanVar(value=bool(self.settings.get("normalize_audio", False)))
+        self.chk_normalize_audio = ctk.CTkCheckBox(
+            self.right_top_panel,
+            text="Normalize audio loudness",
+            variable=self.normalize_audio_var,
+            fg_color=ACCENT_PRIMARY,
+            hover_color=ACCENT_HOVER,
+            font=(FONT_FAMILY, 12),
+        )
+
+        # Video Converter / Trimmer acceleration controls
+        self.stream_copy_var = ctk.BooleanVar(value=bool(self.settings.get("fast_stream_copy", False)))
+        self.chk_stream_copy = ctk.CTkCheckBox(
+            self.right_top_panel,
+            text="Fast Stream Copy (No Re-encode)",
+            variable=self.stream_copy_var,
+            fg_color=ACCENT_PRIMARY,
+            hover_color=ACCENT_HOVER,
+            font=(FONT_FAMILY, 11),
+        )
+        self.hw_accel_var = ctk.BooleanVar(value=bool(self.settings.get("hardware_accel", True)))
+        self.chk_hw_accel = ctk.CTkCheckBox(
+            self.right_top_panel,
+            text="Hardware Accel (Auto GPU)",
+            variable=self.hw_accel_var,
+            fg_color=ACCENT_PRIMARY,
+            hover_color=ACCENT_HOVER,
+            font=(FONT_FAMILY, 11),
+        )
+
         # Destination Card
         self.dest_card = ctk.CTkFrame(
             self.right_top_panel,
@@ -911,6 +1005,13 @@ class AudioMorphApp(_BaseWindow):
         self.ai_action_menu.pack_forget()
         self.lbl_wm_quality.pack_forget()
         self.wm_quality_menu.pack_forget()
+        self.lbl_sample_rate.pack_forget()
+        self.sample_rate_menu.pack_forget()
+        self.lbl_channels.pack_forget()
+        self.channels_menu.pack_forget()
+        self.chk_normalize_audio.pack_forget()
+        self.chk_stream_copy.pack_forget()
+        self.chk_hw_accel.pack_forget()
         self.chk_save_source.pack_forget()
         self.chk_playlist.pack_forget()
         self.lbl_wm_suffix_hint.pack_forget()
@@ -977,6 +1078,22 @@ class AudioMorphApp(_BaseWindow):
         self._hide_right_dynamic_widgets()
         self.lbl_format.pack(anchor="w", padx=12, pady=(0, 4), after=self.lbl_config_title)
         self.format_menu.pack(fill="x", padx=12, pady=(0, 6), after=self.lbl_format)
+
+        if category == "AUDIO":
+            self.lbl_sample_rate.pack(anchor="w", padx=12, pady=(4, 4), after=self.format_menu)
+            self.sample_rate_menu.set(self.settings.get("sample_rate", "44100 Hz"))
+            self.sample_rate_menu.pack(fill="x", padx=12, pady=(0, 6), after=self.lbl_sample_rate)
+            self.lbl_channels.pack(anchor="w", padx=12, pady=(2, 4), after=self.sample_rate_menu)
+            self.channels_menu.set(self.settings.get("channels", "Stereo"))
+            self.channels_menu.pack(fill="x", padx=12, pady=(0, 6), after=self.lbl_channels)
+            self.normalize_audio_var.set(bool(self.settings.get("normalize_audio", False)))
+            self.chk_normalize_audio.pack(anchor="w", padx=12, pady=(2, 6), after=self.channels_menu)
+        elif category == "VIDEO":
+            self.stream_copy_var.set(bool(self.settings.get("fast_stream_copy", False)))
+            self.chk_stream_copy.pack(anchor="w", padx=12, pady=(4, 4), after=self.format_menu)
+            self.hw_accel_var.set(bool(self.settings.get("hardware_accel", True)))
+            self.chk_hw_accel.pack(anchor="w", padx=12, pady=(0, 6), after=self.chk_stream_copy)
+
         self.chk_save_source.pack(anchor="w", padx=12, pady=(0, 6), before=self.path_chip)
         self.save_source_var.set(self.settings.get("save_in_source", True))
         self._refresh_dest_chip(self.settings.get("custom_output_dir", ""), "Source folder")
@@ -1017,6 +1134,10 @@ class AudioMorphApp(_BaseWindow):
 
         self.chk_playlist.pack(anchor="w", padx=12, pady=(0, 6), before=self.path_chip)
         self.playlist_var.set(not self.settings.get("noplaylist", True))
+        self.stream_copy_var.set(bool(self.settings.get("fast_stream_copy", False)))
+        self.chk_stream_copy.pack(anchor="w", padx=12, pady=(2, 4), after=self.quality_menu)
+        self.hw_accel_var.set(bool(self.settings.get("hardware_accel", True)))
+        self.chk_hw_accel.pack(anchor="w", padx=12, pady=(0, 6), after=self.chk_stream_copy)
         self._on_format_change(self.format_menu.get())
 
         out_dir = self.settings.get("download_output_dir", os.path.expanduser("~\\Downloads"))
@@ -1066,8 +1187,9 @@ class AudioMorphApp(_BaseWindow):
             add_text="Add Videos",
         )
 
+        wm_frame = self._get_watermark_frame()
         self.queue_frame.grid_remove()
-        self.watermark_frame.grid(row=1, column=0, sticky="nsew")
+        wm_frame.grid(row=1, column=0, sticky="nsew")
 
         self._hide_right_dynamic_widgets()
         self.lbl_format.pack(anchor="w", padx=12, pady=(0, 4), after=self.lbl_config_title)
@@ -1078,6 +1200,9 @@ class AudioMorphApp(_BaseWindow):
         self.lbl_wm_quality.pack(anchor="w", padx=12, pady=(0, 4), after=self.format_menu)
         self.wm_quality_menu.set(self.settings.get("watermark_quality", "High (Visually Lossless / CRF 18)"))
         self.wm_quality_menu.pack(fill="x", padx=12, pady=(0, 6), after=self.lbl_wm_quality)
+
+        self.hw_accel_var.set(bool(self.settings.get("hardware_accel", True)))
+        self.chk_hw_accel.pack(anchor="w", padx=12, pady=(0, 6), after=self.wm_quality_menu)
 
         self.chk_save_source.pack(anchor="w", padx=12, pady=(0, 4), before=self.path_chip)
         self.save_source_var.set(self.settings.get("watermark_save_in_source", True))
@@ -1090,14 +1215,14 @@ class AudioMorphApp(_BaseWindow):
         if self._last_watermark_output_dir and os.path.isdir(self._last_watermark_output_dir):
             self.completion_banner.grid(row=0, column=0, sticky="ew", padx=14, pady=(6, 4))
 
-        self._on_watermark_queue_changed(len(self.watermark_frame.get_video_queue()))
+        self._on_watermark_queue_changed(len(wm_frame.get_video_queue()))
 
     def _switch_to_viral_clipper(self) -> None:
         if self.current_mode == "VIRAL_CLIPPER":
             return
         self.current_mode = "VIRAL_CLIPPER"
         self._set_active_nav("VIRAL_CLIPPER")
-        self._show_fullscreen_tool(self.viral_frame)
+        self._show_fullscreen_tool(self._get_viral_frame())
 
     def _toggle_online_trimmer(self) -> None:
         if hasattr(self, "online_trimmer"):
@@ -1169,10 +1294,17 @@ class AudioMorphApp(_BaseWindow):
                 ))
 
             try:
+                dl_settings = {
+                    **self.settings,
+                    "fast_stream_copy": bool(self.stream_copy_var.get()),
+                    "hardware_accel": bool(self.hw_accel_var.get()),
+                }
                 out_path = download_trimmed_segment(
                     url=url,
                     start_sec=start_sec,
                     end_sec=end_sec,
+                    settings=dl_settings,
+                    stream_info=stream_info,
                     output_dir=out_dir,
                     format_choice=format_choice,
                     quality_choice=quality_choice,
@@ -1199,28 +1331,28 @@ class AudioMorphApp(_BaseWindow):
             return
         self.current_mode = "CUT"
         self._set_active_nav("CUT")
-        self._show_fullscreen_tool(self.cutter_frame)
+        self._show_fullscreen_tool(self._get_cutter_frame())
 
     def _switch_to_subtitles(self) -> None:
         if self.current_mode == "SUBTITLES":
             return
         self.current_mode = "SUBTITLES"
         self._set_active_nav("SUBTITLES")
-        self._show_fullscreen_tool(self.subtitle_frame)
+        self._show_fullscreen_tool(self._get_subtitle_frame())
 
     def _switch_to_bg_remover(self) -> None:
         if self.current_mode == "BG_REMOVER":
             return
         self.current_mode = "BG_REMOVER"
         self._set_active_nav("BG_REMOVER")
-        self._show_fullscreen_tool(self.bg_frame)
+        self._show_fullscreen_tool(self._get_bg_frame())
 
     def _switch_to_vocal_isolator(self) -> None:
         if self.current_mode == "VOCAL_ISOLATOR":
             return
         self.current_mode = "VOCAL_ISOLATOR"
         self._set_active_nav("VOCAL_ISOLATOR")
-        self._show_fullscreen_tool(self.vocal_frame)
+        self._show_fullscreen_tool(self._get_vocal_frame())
 
     def _on_watermark_queue_changed(self, count: int) -> None:
         if self.current_mode == "WATERMARK":
@@ -1233,9 +1365,13 @@ class AudioMorphApp(_BaseWindow):
             if choice.upper() in ["JPG", "PNG", "WEBP"]:
                 self.lbl_quality.pack_forget()
                 self.quality_menu.pack_forget()
+                self.chk_stream_copy.pack_forget()
+                self.chk_hw_accel.pack_forget()
             else:
                 self.lbl_quality.pack(anchor="w", padx=12, pady=(0, 4), after=self.format_menu)
                 self.quality_menu.pack(fill="x", padx=12, pady=(0, 6), after=self.lbl_quality)
+                self.chk_stream_copy.pack(anchor="w", padx=12, pady=(2, 4), after=self.quality_menu)
+                self.chk_hw_accel.pack(anchor="w", padx=12, pady=(0, 6), after=self.chk_stream_copy)
 
     # ══════════════════════════════════════════════════════════════════
     #  Output Folder
@@ -1272,12 +1408,24 @@ class AudioMorphApp(_BaseWindow):
     #  Drag & Drop
     # ══════════════════════════════════════════════════════════════════
 
-    def _enable_drag_and_drop(self) -> None:
+    def _register_dnd_targets(self, targets: list) -> None:
+        if not _HAS_DND:
+            return
+
         def on_drop(e):
             for f in self.tk.splitlist(e.data):
                 self._add_to_queue(f)
 
-        targets = [
+        for w in targets:
+            if w and hasattr(w, "drop_target_register"):
+                try:
+                    w.drop_target_register(DND_FILES)
+                    w.dnd_bind("<<Drop>>", on_drop)
+                except Exception as ex:
+                    log.debug("Failed registering drop target on %s: %s", w, ex)
+
+    def _enable_drag_and_drop(self) -> None:
+        self._register_dnd_targets([
             self,
             self.center_container,
             self.queue_frame,
@@ -1286,25 +1434,8 @@ class AudioMorphApp(_BaseWindow):
             self.empty_hero_convert,
             self.empty_hero_download,
             self.empty_hero_ai,
-            getattr(self, "cutter_frame", None),
-            getattr(self, "subtitle_frame", None),
-            getattr(self, "bg_frame", None),
-            getattr(self, "vocal_frame", None),
-            getattr(self, "watermark_frame", None),
-            getattr(getattr(self, "watermark_frame", None), "canvas", None),
-            getattr(getattr(self, "watermark_frame", None), "empty_hero", None),
-            getattr(getattr(self, "watermark_frame", None), "queue_list", None),
-            getattr(self, "viral_frame", None),
-            getattr(getattr(self, "viral_frame", None), "preview_canvas", None),
             getattr(self, "online_trimmer", None),
-        ]
-        for w in targets:
-            if w and hasattr(w, "drop_target_register"):
-                try:
-                    w.drop_target_register(DND_FILES)
-                    w.dnd_bind("<<Drop>>", on_drop)
-                except Exception as ex:
-                    log.debug("Failed registering drop target on %s: %s", w, ex)
+        ])
 
     # ══════════════════════════════════════════════════════════════════
     #  Queue Management (Modern File Cards)
@@ -1328,28 +1459,27 @@ class AudioMorphApp(_BaseWindow):
             return
 
         if self.current_mode == "CUT":
-            self.cutter_frame.load_audio_from_path(filepath)
+            self._get_cutter_frame().load_audio_from_path(filepath)
             return
 
         if self.current_mode == "SUBTITLES":
-            self.subtitle_frame.load_from_path(filepath)
+            self._get_subtitle_frame().load_from_path(filepath)
             return
 
         if self.current_mode == "BG_REMOVER":
-            self.bg_frame.load_file_from_path(filepath)
+            self._get_bg_frame().load_file_from_path(filepath)
             return
 
         if self.current_mode == "VOCAL_ISOLATOR":
-            self.vocal_frame.load_file_from_path(filepath)
+            self._get_vocal_frame().load_file_from_path(filepath)
             return
 
         if self.current_mode == "WATERMARK":
-            self.watermark_frame.add_path(filepath)
+            self._get_watermark_frame().add_path(filepath)
             return
 
         if self.current_mode == "VIRAL_CLIPPER":
-            if hasattr(self, "viral_frame"):
-                self.viral_frame.load_source(filepath)
+            self._get_viral_frame().load_source(filepath)
             return
 
         if filepath not in self.file_queue:
@@ -1473,6 +1603,11 @@ class AudioMorphApp(_BaseWindow):
             from core.worker import ConversionWorker
             self.settings.update({
                 "output_format": self.format_menu.get().lower(),
+                "sample_rate": self.sample_rate_menu.get(),
+                "channels": self.channels_menu.get(),
+                "normalize_audio": bool(self.normalize_audio_var.get()),
+                "fast_stream_copy": bool(self.stream_copy_var.get()),
+                "hardware_accel": bool(self.hw_accel_var.get()),
                 "save_in_source": self.save_source_var.get(),
             })
             save_settings(self.settings)
@@ -1485,13 +1620,15 @@ class AudioMorphApp(_BaseWindow):
 
         elif self.current_mode == "AI_TOOLS":
             self._last_output_dir = os.path.dirname(self.file_queue[0])
-            self.worker = AIWorker(self.file_queue, self.ai_action_menu.get(), callbacks)
+            self.worker = AIWorker(self.file_queue, self.ai_action_menu.get(), callbacks, settings=self.settings)
 
         else:
             from core.download_worker import DownloadWorker
             self.settings.update({
                 "download_format": self.format_menu.get().upper(),
                 "download_quality": self.quality_menu.get(),
+                "fast_stream_copy": bool(self.stream_copy_var.get()),
+                "hardware_accel": bool(self.hw_accel_var.get()),
                 "noplaylist": not self.playlist_var.get(),
             })
             save_settings(self.settings)
@@ -1502,12 +1639,13 @@ class AudioMorphApp(_BaseWindow):
         log.info("Worker started — mode=%s, items=%d", self.current_mode, len(self.file_queue))
 
     def _start_watermark_export(self) -> None:
-        videos = self.watermark_frame.get_video_queue()
+        wm_frame = self._get_watermark_frame()
+        videos = wm_frame.get_video_queue()
         if not videos:
             messagebox.showinfo("No Videos", "Add at least one video to export.")
             return
 
-        wm_cfg = self.watermark_frame.get_watermark_config()
+        wm_cfg = wm_frame.get_watermark_config()
         if wm_cfg.get("type") == "image":
             img_path = (wm_cfg.get("image_path") or "").strip()
             if not img_path or not os.path.isfile(img_path):
@@ -1517,8 +1655,8 @@ class AudioMorphApp(_BaseWindow):
             messagebox.showwarning("Empty Text", "Please enter watermark text before exporting.")
             return
 
-        self.watermark_frame.stop_playback()
-        self.watermark_frame.set_export_locked(True)
+        wm_frame.stop_playback()
+        wm_frame.set_export_locked(True)
         self.completion_banner.grid_remove()
 
         export_settings = {
@@ -1526,11 +1664,13 @@ class AudioMorphApp(_BaseWindow):
             "quality": self.wm_quality_menu.get(),
             "save_in_source": self.save_source_var.get(),
             "custom_output_dir": self.settings.get("watermark_output_dir", ""),
+            "hardware_accel": bool(self.hw_accel_var.get()),
         }
         self.settings.update({
             "watermark_format": export_settings["format"],
             "watermark_quality": export_settings["quality"],
             "watermark_save_in_source": export_settings["save_in_source"],
+            "hardware_accel": export_settings["hardware_accel"],
         })
         save_settings(self.settings)
 
@@ -1652,7 +1792,8 @@ class AudioMorphApp(_BaseWindow):
         elif self.current_mode == "AI_TOOLS":
             text = "START AI PROCESS"
         elif self.current_mode == "WATERMARK":
-            cnt = len(self.watermark_frame.get_video_queue())
+            wm = getattr(self, "watermark_frame", None)
+            cnt = len(wm.get_video_queue()) if wm else 0
             text = "EXPORT BATCH" if cnt >= 2 else "EXPORT VIDEO"
         else:
             text = "DOWNLOAD"
@@ -1661,16 +1802,18 @@ class AudioMorphApp(_BaseWindow):
 
     def _on_close(self) -> None:
         try:
-            if getattr(self, "watermark_frame", None):
-                self.watermark_frame.stop_playback()
-            if getattr(self, "viral_frame", None):
-                self.viral_frame.stop_playback()
+            for attr in ("watermark_frame", "viral_frame", "cutter_frame", "subtitle_frame", "bg_frame", "vocal_frame"):
+                frame = getattr(self, attr, None)
+                if frame is None:
+                    continue
+                if hasattr(frame, "cleanup"):
+                    frame.cleanup()
+                elif hasattr(frame, "stop_playback"):
+                    frame.stop_playback()
+                elif hasattr(frame, "stop_audio"):
+                    frame.stop_audio()
             if getattr(self, "online_trimmer", None) and hasattr(self.online_trimmer, "stop_playback"):
                 self.online_trimmer.stop_playback()
-            if getattr(self, "cutter_frame", None):
-                self.cutter_frame.stop_audio()
-            if getattr(self, "vocal_frame", None):
-                self.vocal_frame.stop_audio()
             if self.worker is not None and hasattr(self.worker, "cancel"):
                 self.worker.cancel()
         finally:

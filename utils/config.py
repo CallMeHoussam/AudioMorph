@@ -9,6 +9,7 @@ never lose settings.
 import copy
 import json
 import os
+import subprocess
 import sys
 from pathlib import Path
 from typing import Optional
@@ -59,6 +60,10 @@ DEFAULT_SETTINGS: dict = {
     "bitrate": "192 kbps",
     "sample_rate": "44100 Hz",
     "channels": "Stereo",
+    "normalize_audio": False,
+    "fast_stream_copy": False,
+    "hardware_accel": True,
+    "last_ytdlp_check": 0.0,
     "save_in_source": True,
     "custom_output_dir": "",
     "download_format": "MP4",
@@ -182,3 +187,92 @@ def get_ffplay_path() -> Optional[str]:
 def get_icon_path() -> str:
     """Return the absolute path to the application icon."""
     return str(_PROJECT_ROOT / "icon.ico")
+
+
+_HW_ENCODER_UNSET = object()
+_HW_ENCODER_CACHE: object = _HW_ENCODER_UNSET
+
+
+def detect_hardware_h264_encoder(force_refresh: bool = False) -> Optional[str]:
+    """
+    Probe once (cached in memory) whether bundled FFmpeg supports hardware H.264
+    encoding (``h264_nvenc``, ``h264_qsv``, or ``h264_amf``) on this machine.
+    Returns the first working encoder name or ``None``.
+    """
+    global _HW_ENCODER_CACHE
+    if _HW_ENCODER_CACHE is not _HW_ENCODER_UNSET and not force_refresh:
+        return _HW_ENCODER_CACHE  # type: ignore[return-value]
+
+    ffmpeg_exe = get_ffmpeg_path()
+    if not os.path.exists(ffmpeg_exe):
+        _HW_ENCODER_CACHE = None
+        return None
+
+    creationflags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
+    try:
+        enc_proc = subprocess.run(
+            [ffmpeg_exe, "-hide_banner", "-encoders"],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=4,
+            creationflags=creationflags,
+        )
+        encoders_out = enc_proc.stdout or ""
+    except Exception as exc:
+        log.debug("Failed querying FFmpeg encoders: %s", exc)
+        _HW_ENCODER_CACHE = None
+        return None
+
+    for candidate in ("h264_nvenc", "h264_qsv", "h264_amf"):
+        if candidate not in encoders_out:
+            continue
+        try:
+            test_proc = subprocess.run(
+                [
+                    ffmpeg_exe,
+                    "-hide_banner",
+                    "-loglevel", "error",
+                    "-f", "lavfi",
+                    "-i", "color=c=black:s=256x256:d=0.05",
+                    "-frames:v", "1",
+                    "-c:v", candidate,
+                    "-f", "null",
+                    "-",
+                ],
+                capture_output=True,
+                timeout=4,
+                creationflags=creationflags,
+            )
+            if test_proc.returncode == 0:
+                log.info("Detected working hardware H.264 encoder: %s", candidate)
+                _HW_ENCODER_CACHE = candidate
+                return candidate
+        except Exception as exc:
+            log.debug("Hardware encoder %s probe failed: %s", candidate, exc)
+
+    _HW_ENCODER_CACHE = None
+    return None
+
+
+def get_video_encoder_args(
+    use_hw: bool = True,
+    crf: int = 18,
+    preset: str = "medium",
+) -> tuple[str, list[str]]:
+    """
+    Return ``(encoder_name, ffmpeg_video_args)`` choosing a verified hardware
+    H.264 encoder when *use_hw* is enabled and available, else ``libx264``.
+    """
+    hw = detect_hardware_h264_encoder() if use_hw else None
+    if hw == "h264_nvenc":
+        return hw, ["-c:v", "h264_nvenc", "-cq", str(crf), "-preset", "p4", "-pix_fmt", "yuv420p"]
+    if hw == "h264_qsv":
+        return hw, ["-c:v", "h264_qsv", "-global_quality", str(crf), "-pix_fmt", "yuv420p"]
+    if hw == "h264_amf":
+        return hw, [
+            "-c:v", "h264_amf", "-quality", "balanced", "-rc", "cqp",
+            "-qp_i", str(crf), "-qp_p", str(crf), "-pix_fmt", "yuv420p",
+        ]
+    return "libx264", ["-c:v", "libx264", "-crf", str(crf), "-preset", preset, "-pix_fmt", "yuv420p"]

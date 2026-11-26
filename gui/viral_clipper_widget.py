@@ -1366,3 +1366,8 @@ class ViralClipperWidget(ctk.CTkFrame):
             )
             if succeeded > 0:
                 self.completion_banner.pack(fill="x", pady=(0, 6), before=self.lbl_export_status)
+
+    def cleanup(self) -> None:
+        self.stop_playback()
+        if self._active_worker is not None:
+            self._active_worker.cancel()

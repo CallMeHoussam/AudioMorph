@@ -17,7 +17,7 @@ from typing import Callable, Optional
 
 from PIL import Image
 
-from utils.config import get_ffmpeg_path, get_ffplay_path
+from utils.config import get_ffmpeg_path, get_ffplay_path, get_video_encoder_args
 from utils.logger import get_logger
 
 log = get_logger(__name__)
@@ -412,28 +412,8 @@ class OnlineStreamPlayer:
                 self.is_playing = False
                 return False
 
-            # Optional audio preview via ffplay
-            ffplay_exe = get_ffplay_path()
-            if ffplay_exe and self.audio_enabled and self.preview_audio_url:
-                try:
-                    audio_cmd = [
-                        ffplay_exe,
-                        "-nodisp",
-                        "-autoexit",
-                        "-loglevel", "quiet",
-                        "-ss", f"{self.current_time:.3f}",
-                        self.preview_audio_url,
-                    ]
-                    self._proc_audio = subprocess.Popen(
-                        audio_cmd,
-                        stdout=subprocess.DEVNULL,
-                        stderr=subprocess.DEVNULL,
-                        stdin=subprocess.DEVNULL,
-                        creationflags=_CREATE_NO_WINDOW,
-                    )
-                except Exception as ex:
-                    log.debug("ffplay audio preview start failed: %s", ex)
-
+            # Audio preview (ffplay) is launched inside _stream_loop once the first
+            # video frame finishes HTTP buffering so A/V start in tight sync.
             self._worker_thread = threading.Thread(target=self._stream_loop, daemon=True)
             self._worker_thread.start()
 
@@ -441,8 +421,34 @@ class OnlineStreamPlayer:
             self.on_state_change(True)
         return True
 
+    def _start_ffplay_audio(self, start_ts: float) -> None:
+        ffplay_exe = get_ffplay_path()
+        if not (ffplay_exe and self.audio_enabled and self.preview_audio_url):
+            return
+        try:
+            audio_cmd = [
+                ffplay_exe,
+                "-nodisp",
+                "-autoexit",
+                "-loglevel", "quiet",
+                "-ss", f"{start_ts:.3f}",
+                self.preview_audio_url,
+            ]
+            with self._lock:
+                if self._stop_event.is_set() or not self.is_playing:
+                    return
+                self._proc_audio = subprocess.Popen(
+                    audio_cmd,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    stdin=subprocess.DEVNULL,
+                    creationflags=_CREATE_NO_WINDOW,
+                )
+        except Exception as ex:
+            log.debug("ffplay audio preview start failed: %s", ex)
+
     def _stream_loop(self) -> None:
-        start_wall_time = time.monotonic()
+        start_wall_time: Optional[float] = None
         base_timestamp = self.current_time
         frame_interval = 1.0 / float(self.fps)
         frame_count = 0
@@ -456,6 +462,11 @@ class OnlineStreamPlayer:
                 chunk = proc.stdout.read(frame_size)
                 if not chunk or len(chunk) < frame_size:
                     break
+
+                # Sync wall-clock & audio launch to the moment the first video frame arrives
+                if start_wall_time is None:
+                    start_wall_time = time.monotonic()
+                    self._start_ffplay_audio(base_timestamp)
 
                 current_ts = base_timestamp + (frame_count * frame_interval)
                 self.current_time = current_ts
@@ -512,8 +523,8 @@ class OnlineStreamPlayer:
             except Exception:
                 try:
                     p.kill()
-                except Exception:
-                    pass
+                except Exception as exc:
+                    log.debug("Video pipe kill failed: %s", exc)
 
         if self._proc_audio:
             pa = self._proc_audio
@@ -524,8 +535,8 @@ class OnlineStreamPlayer:
             except Exception:
                 try:
                     pa.kill()
-                except Exception:
-                    pass
+                except Exception as exc:
+                    log.debug("Audio preview kill failed: %s", exc)
 
     def seek(self, timestamp: float) -> None:
         timestamp = max(0.0, min(self.total_duration, float(timestamp)))
@@ -628,30 +639,37 @@ def download_trimmed_segment(
         out_name = f"{safe_title}_{format_seconds(start_sec).replace(':', '-')}_to_{format_seconds(end_sec).replace(':', '-')}.{fmt}"
         out_path = os.path.join(target_out_dir, out_name)
 
-        cmd = [ffmpeg_exe, "-y", "-ss", f"{start_sec:.3f}", "-to", f"{end_sec:.3f}", "-i", stream_info.stream_url]
-        if stream_info.audio_stream_url and stream_info.audio_stream_url != stream_info.stream_url:
-            cmd.extend(["-ss", f"{start_sec:.3f}", "-to", f"{end_sec:.3f}", "-i", stream_info.audio_stream_url])
-            cmd.extend(["-map", "0:v:0", "-map", "1:a:0?"])
-        else:
-            cmd.extend(["-map", "0:v:0", "-map", "0:a:0?"])
+        use_stream_copy = bool(cfg.get("fast_stream_copy", False))
+        use_hw = bool(cfg.get("hardware_accel", True))
 
-        if fmt in ["mp3", "m4a", "wav", "flac"]:
-            cmd.extend(["-vn"])
-            if fmt == "mp3":
-                cmd.extend(["-c:a", "libmp3lame", "-b:a", "192k"])
-            elif fmt == "wav":
-                cmd.extend(["-c:a", "pcm_s16le"])
+        def _build_trim_cmd(stream_copy: bool = False, force_sw: bool = False) -> list[str]:
+            c = [ffmpeg_exe, "-y", "-ss", f"{start_sec:.3f}", "-to", f"{end_sec:.3f}", "-i", stream_info.stream_url]
+            if stream_info.audio_stream_url and stream_info.audio_stream_url != stream_info.stream_url:
+                c.extend(["-ss", f"{start_sec:.3f}", "-to", f"{end_sec:.3f}", "-i", stream_info.audio_stream_url])
+                c.extend(["-map", "0:v:0", "-map", "1:a:0?"])
             else:
-                cmd.extend(["-c:a", "aac", "-b:a", "192k"])
-        else:
-            cmd.extend(["-c:v", "libx264", "-crf", "18", "-preset", "fast", "-c:a", "aac", "-b:a", "192k"])
+                c.extend(["-map", "0:v:0", "-map", "0:a:0?"])
 
-        cmd.append(out_path)
+            if fmt in ["mp3", "m4a", "wav", "flac"]:
+                c.extend(["-vn"])
+                if fmt == "mp3":
+                    c.extend(["-c:a", "libmp3lame", "-b:a", "192k"])
+                elif fmt == "wav":
+                    c.extend(["-c:a", "pcm_s16le"])
+                else:
+                    c.extend(["-c:a", "aac", "-b:a", "192k"])
+            elif stream_copy:
+                c.extend(["-c", "copy"])
+            else:
+                _, v_args = get_video_encoder_args(use_hw=(False if force_sw else use_hw), crf=18, preset="fast")
+                c.extend([*v_args, "-c:a", "aac", "-b:a", "192k"])
+            c.append(out_path)
+            return c
 
-        try:
-            log.info("Running direct stream segment extraction: %s", " ".join(cmd[:8]))
+        def _run_trim_cmd(c: list[str], mode_label: str) -> int:
+            log.info("Running direct stream segment extraction (%s): %s", mode_label, " ".join(c[:8]))
             proc = subprocess.Popen(
-                cmd,
+                c,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 universal_newlines=True,
@@ -659,7 +677,6 @@ def download_trimmed_segment(
                 errors="replace",
                 creationflags=_CREATE_NO_WINDOW,
             )
-
             time_regex = re.compile(r"time=(\d{2}):(\d{2}):(\d{2})\.(\d{2})")
             if proc.stdout:
                 for line in proc.stdout:
@@ -668,8 +685,8 @@ def download_trimmed_segment(
                         try:
                             if os.path.exists(out_path):
                                 os.remove(out_path)
-                        except OSError:
-                            pass
+                        except OSError as exc:
+                            log.debug("Failed removing cancelled clip %s: %s", out_path, exc)
                         raise RuntimeError("Download cancelled by user")
 
                     m = time_regex.search(line)
@@ -677,10 +694,24 @@ def download_trimmed_segment(
                         h, mn, s, cs = map(int, m.groups())
                         cur = h * 3600.0 + mn * 60.0 + s + cs / 100.0
                         pct = min(99, max(1, int((cur / duration_clip) * 100)))
-                        _report_prog(pct=pct, speed="Direct Stream", status="trimming")
-
+                        _report_prog(pct=pct, speed=mode_label, status="trimming")
             proc.wait()
-            if proc.returncode == 0 and os.path.exists(out_path) and os.path.getsize(out_path) > 1024:
+            return proc.returncode
+
+        try:
+            is_video_out = fmt not in ["mp3", "m4a", "wav", "flac"]
+            rc = 1
+            if use_stream_copy and is_video_out:
+                rc = _run_trim_cmd(_build_trim_cmd(stream_copy=True), "Stream Copy")
+                if rc != 0:
+                    log.info("Stream-copy trim failed (exit %d); falling back to re-encode.", rc)
+
+            if rc != 0:
+                rc = _run_trim_cmd(_build_trim_cmd(stream_copy=False, force_sw=False), "Direct Stream")
+                if rc != 0 and use_hw and is_video_out:
+                    rc = _run_trim_cmd(_build_trim_cmd(stream_copy=False, force_sw=True), "Direct Stream SW")
+
+            if rc == 0 and os.path.exists(out_path) and os.path.getsize(out_path) > 1024:
                 _report_prog(pct=100, status="finished")
                 return out_name
         except Exception as ex:
