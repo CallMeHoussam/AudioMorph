@@ -1,0 +1,66 @@
+================================================================================
+CONTRAT DE LICENCE UTILISATEUR FINAL (CLUF) - AUDIOMORPH STUDIO
+================================================================================
+DerniÃ¨re mise Ã  jour : Novembre 2026
+
+VEUILLEZ LIRE ATTENTIVEMENT CE CONTRAT AVANT D'INSTALLER OU D'UTILISER AUDIOMORPH
+STUDIO. EN INSTALLANT, COPIANT OU UTILISANT CE LOGICIEL, VOUS ACCEPTEZ D'ÃŠTRE LIÃ‰
+PAR LES TERMES DU PRÃ‰SENT CONTRAT. SI VOUS N'ACCEPTEZ PAS CES TERMES, N'INSTALLEZ
+PAS ET N'UTILISEZ PAS CE LOGICIEL.
+
+--------------------------------------------------------------------------------
+1. CONCESSION DE LICENCE & UTILISATION AUTORISÃ‰E
+--------------------------------------------------------------------------------
+AudioMorph Studio est dÃ©veloppÃ© par Evoless et distribuÃ© sous les termes de la 
+licence MIT. Il vous est accordÃ© une licence non exclusive, mondiale et libre 
+de droits pour installer, exÃ©cuter, modifier et utiliser l'application Ã  des fins 
+personnelles, Ã©ducatives, crÃ©atives ou commerciales de production multimÃ©dia.
+
+--------------------------------------------------------------------------------
+2. RESPONSABILITÃ‰ DE L'UTILISATEUR & RESPECT DU DROIT D'AUTEUR
+--------------------------------------------------------------------------------
+AudioMorph Studio met Ã  disposition des outils de conversion, d'extraction audio, 
+d'incrustation de filigranes, de dÃ©coupage de flux et de sous-titrage automatisÃ©.
+
+Vous reconnaissez et acceptez expressÃ©ment que :
+a) Vous Ãªtes seul et unique responsable de vÃ©rifier que vous possÃ©dez tous les 
+   droits, autorisations ou licences nÃ©cessaires pour tÃ©lÃ©charger, dÃ©couper, 
+   enregistrer ou traiter des mÃ©dias issus de plateformes tierces (notamment 
+   YouTube, TikTok, Instagram, Twitch, Kick, X / Twitter ou tout fichier local).
+b) AudioMorph Studio ne doit en aucun cas Ãªtre employÃ© pour porter atteinte aux 
+   droits de propriÃ©tÃ© intellectuelle d'autrui ou contourner illÃ©galement des 
+   protections numÃ©riques.
+c) L'auteur et dÃ©veloppeur dÃ©cline toute responsabilitÃ© quant Ã  l'usage que vous 
+   faites de ce logiciel ou aux contenus que vous gÃ©nÃ©rez.
+
+--------------------------------------------------------------------------------
+3. COMPOSANTS TIERS & SERVICES D'INTELLIGENCE ARTIFICIELLE
+--------------------------------------------------------------------------------
+a) Le logiciel intÃ¨gre ou interagit avec des solutions open-source reconnues telles 
+   que FFmpeg, FFprobe et yt-dlp, chacune soumise Ã  ses licences respectives 
+   (GNU LGPL/GPL, Unlicense).
+b) Lors de l'activation des fonctionnalitÃ©s d'IA optionnelles (Gemini, OpenAI, 
+   Ollama local), vous configurez vos propres clÃ©s d'API. L'usage de ces modÃ¨les 
+   est rÃ©gi par les conditions d'utilisation des fournisseurs concernÃ©s.
+
+--------------------------------------------------------------------------------
+4. CONFIDENTIALITÃ‰ & TRAITEMENT LOCAL
+--------------------------------------------------------------------------------
+a) AudioMorph Studio repose sur une exÃ©cution locale (Â« offline-first Â»). Les 
+   traitements vidÃ©o, conversions, dÃ©coupages et rendus sont rÃ©alisÃ©s directement 
+   sur les composants matÃ©riels de votre ordinateur.
+b) Aucune tÃ©lÃ©mÃ©trie cachÃ©e, fichier multimÃ©dia ou donnÃ©e personnelle n'est 
+   transmise vers des serveurs distants du dÃ©veloppeur.
+c) Vos paramÃ¨tres, clÃ©s d'API et modÃ¨les personnalisÃ©s (filigranes, profils) 
+   demeurent strictement stockÃ©s en local sur votre systÃ¨me.
+
+--------------------------------------------------------------------------------
+5. EXCLUSION DE GARANTIE & LIMITATION DE RESPONSABILITÃ‰
+--------------------------------------------------------------------------------
+LE LOGICIEL EST FOURNI Â« EN L'Ã‰TAT Â», SANS AUCUNE GARANTIE EXPRESSE OU IMPLICITE, 
+Y COMPRIS MAIS SANS S'Y LIMITER LES GARANTIES DE QUALITÃ‰ MARCHANDE OU D'ADÃ‰QUATION 
+Ã€ UN USAGE PARTICULIER.
+
+EN AUCUN CAS L'AUTEUR NE POURRA ÃŠTRE TENU RESPONSABLE DE TOUT DOMMAGE DIRECT, 
+INDIRECT, PERTE DE DONNÃ‰ES OU DÃ‰FAILLANCE RÃ‰SULTANT DE L'UTILISATION DU LOGICIEL.
+================================================================================

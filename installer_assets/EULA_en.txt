@@ -1,0 +1,69 @@
+================================================================================
+AUDIOMORPH STUDIO - END USER LICENSE AGREEMENT (EULA)
+================================================================================
+Last Updated: November 2026
+
+PLEASE READ THIS AGREEMENT CAREFULLY BEFORE INSTALLING OR USING AUDIOMORPH STUDIO.
+BY INSTALLING, COPYING, OR USING THIS SOFTWARE, YOU AGREE TO BE BOUND BY THE 
+TERMS OF THIS AGREEMENT. IF YOU DO NOT AGREE, DO NOT INSTALL OR USE THE SOFTWARE.
+
+--------------------------------------------------------------------------------
+1. LICENSE GRANT & PERMITTED USE
+--------------------------------------------------------------------------------
+AudioMorph Studio is developed by Evoless and licensed under the permissive terms 
+of the MIT License. You are granted a non-exclusive, worldwide, royalty-free 
+license to use, run, modify, and distribute the application for personal, 
+educational, creative, or commercial media production purposes, subject to the 
+conditions stated herein.
+
+--------------------------------------------------------------------------------
+2. USER RESPONSIBILITY & COPYRIGHT COMPLIANCE
+--------------------------------------------------------------------------------
+AudioMorph Studio provides media conversion, audio extraction, watermarking, 
+stream clipping, and automated transcription tools. 
+
+You acknowledge and agree that:
+a) You are solely responsible for ensuring that you hold all legal rights, 
+   licenses, or explicit permissions required to download, record, clip, trim, 
+   or process content from external platforms (including but not limited to 
+   YouTube, TikTok, Instagram, Twitch, Kick, and X / Twitter).
+b) AudioMorph Studio must NOT be used to infringe intellectual property rights, 
+   violate third-party platform Terms of Service, or bypass technological 
+   protection measures without proper authorization.
+c) The developer assumes no responsibility or liability for how you choose 
+   to utilize this software or for any content you download or produce.
+
+--------------------------------------------------------------------------------
+3. THIRD-PARTY COMPONENTS & EXTERNAL APIS
+--------------------------------------------------------------------------------
+a) AudioMorph Studio bundles or interfaces with open-source tools including 
+   FFmpeg, FFprobe, and yt-dlp, each governed by their respective licenses 
+   (e.g., GNU LGPL/GPL, Unlicense).
+b) When utilizing optional AI features (such as Gemini, OpenAI, or local Ollama), 
+   you provide your own API credentials. Your use of third-party AI models is 
+   subject to the respective API terms and acceptable use policies of those 
+   providers.
+
+--------------------------------------------------------------------------------
+4. PRIVACY & LOCAL PROCESSING
+--------------------------------------------------------------------------------
+a) AudioMorph Studio is designed with an offline-first architecture. All media 
+   rendering, conversion, watermarking, and cutting processes occur entirely on 
+   your local computer hardware.
+b) No background telemetry, personal files, or usage statistics are uploaded 
+   to developer servers.
+c) User configurations, custom presets (such as watermark profiles), and API keys 
+   remain strictly stored on your local machine in your application settings.
+
+--------------------------------------------------------------------------------
+5. DISCLAIMER OF WARRANTY & LIMITATION OF LIABILITY
+--------------------------------------------------------------------------------
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR 
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, 
+FITNESS FOR A PARTICULAR PURPOSE, AND NONINFRINGEMENT.
+
+IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, 
+DAMAGES, LOSS OF DATA, HARDWARE MALFUNCTION, OR OTHER LIABILITY ARISING FROM, 
+OUT OF, OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN 
+THE SOFTWARE.
+================================================================================
